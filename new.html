@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simon Vans-Colina | CTO and co-founder Pave Bank</title>
+    <style>
+        body { margin: 0; }
+        canvas { width: 100%; height: 100%; }
+        .info {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            font-family: 'Arial', sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <h1>Simon Vans-Colina</h1>
+        <h2>CTO and co-founder Pave Bank</h2>
+        <p>Email: simon (at) vans-colina (dot) com</p>
+        <p>Email: simon (at) pavebank (dot) com</p>
+        <p>Twitter: <a href="https://twitter.com/simonvc" target="_blank">@simonvc</a></p>
+        <p>Telegram: <a href="https://t.me/simonvc" target="_blank">@simonvc</a></p>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const geometry = new THREE.PlaneGeometry(5, 3);
+        const material = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.7 });
+        const plane = new THREE.Mesh(geometry, material);
+        scene.add(plane);
+
+        const lines = [];
+        for (let i = 0; i < 100; i++) {
+            const geometry = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(Math.random() * 20 - 10, Math.random() * 20 - 10, Math.random() * 20 - 10),
+                new THREE.Vector3(Math.random() * 20 - 10, Math.random() * 20 - 10, Math.random() * 20 - 10)
+            ]);
+            const material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+            const line = new THREE.Line(geometry, material);
+            lines.push(line);
+            scene.add(line);
+        }
+
+        camera.position.z = 5;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            plane.rotation.x += 0.01;
+            plane.rotation.y += 0.01;
+            lines.forEach(line => {
+                line.rotation.x += 0.005;
+                line.rotation.y += 0.005;
+            });
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
