@@ -6,7 +6,7 @@
     <title>Simon Vans-Colina | CTO and co-founder Pave Bank</title>
     <style>
         body { margin: 0; }
-        canvas { width: 100%; height: 100%; position: absolute; }
+        canvas { width: 100%; height: 100%; }
         .info {
             position: absolute;
             top: 50%;
@@ -29,18 +29,14 @@
         <p>Telegram: <a href="https://t.me/simonvc" target="_blank">@simonvc</a></p>
     </div>
     
-    <canvas id="bg-canvas"></canvas>
-    <canvas id="main-canvas"></canvas>
+    <canvas id="canvas"></canvas>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('main-canvas') });
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas') });
         renderer.setSize(window.innerWidth, window.innerHeight);
-
-        const bgRenderer = new THREE.WebGLRenderer({ canvas: document.getElementById('bg-canvas') });
-        bgRenderer.setSize(window.innerWidth, window.innerHeight);
 
         const geometry = new THREE.PlaneGeometry(5, 3);
         const material = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.7 });
@@ -70,13 +66,17 @@
                 line.rotation.y += 0.005;
             });
 
-            bgRenderer.render(scene, camera);
-            const bgCanvas = document.getElementById('bg-canvas');
-            const ctx = bgCanvas.getContext('2d');
-            ctx.filter = 'blur(10px)';
-            ctx.drawImage(bgCanvas, 0, 0);
-
             renderer.render(scene, camera);
+
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.min(centerX, centerY));
+            gradient.addColorStop(0, 'rgba(0, 0, 0, 0.5)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
         animate();
     </script>
