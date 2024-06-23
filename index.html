@@ -50,6 +50,7 @@
         a {
             color: #4da6ff;
             text-decoration: none;
+            cursor: pointer;
         }
         @keyframes float {
             0% { transform: translate(-50%, -50%) translateY(0px); }
@@ -63,6 +64,27 @@
             75% { transform: translate(-50%, -50%) rotate(-5deg); }
             100% { transform: translate(-50%, -50%) rotate(0deg); }
         }
+        #flash {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 48px;
+            font-weight: bold;
+            color: black;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.1s ease-in-out;
+        }
+        #flash span {
+            width: 100%;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -70,11 +92,12 @@
     <div class="card">
         <h1>Simon Vans-Colina</h1>
         <h2>CTO and Co-Founder Pave Bank</h2>
-        <p><a href="mailto:simon@vans-colina.com">simon@vans-colina.com</a></p>
-        <p><a href="mailto:simon@pavebank.com">simon@pavebank.com</a></p>
+        <p><a onclick="copyToClipboard('simon@vans-colina.com')">simon@vans-colina.com</a></p>
+        <p><a onclick="copyToClipboard('simon@pavebank.com')">simon@pavebank.com</a></p>
         <p>Twitter: <a href="https://twitter.com/simonvc">@simonvc</a></p>
         <p>Telegram: <a href="https://t.me/simonvc">@simonvc</a></p>
     </div>
+    <div id="flash"><span>COPIED</span></div>
     <script>
         const canvas = document.getElementById('space');
         const ctx = canvas.getContext('2d');
@@ -172,6 +195,18 @@
             }
             drawConnections();
             requestAnimationFrame(animate);
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                const flash = document.getElementById('flash');
+                flash.style.opacity = '1';
+                setTimeout(() => {
+                    flash.style.opacity = '0';
+                }, 250);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+            });
         }
 
         init();
