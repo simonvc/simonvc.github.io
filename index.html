@@ -3,74 +3,182 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simon Vans-Colina</title>
+    <title>Simon Vans-Colina - Business Card</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f5f5f5;
+        body, html {
             margin: 0;
             padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+            height: 100%;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-color: #000;
+            color: #fff;
         }
-        .container {
-            background-color: #ffffff;
+        #space {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .card {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            height: 180px;
+            background-color: rgba(255, 255, 255, 0.1);
             border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            padding: 40px;
-            max-width: 600px;
-            text-align: center;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+            animation: float 6s ease-in-out infinite, precess 20s linear infinite;
         }
         h1 {
-            font-size: 36px;
-            color: #333;
-            margin-bottom: 10px;
-        }
-        h3 {
+            margin: 0 0 10px 0;
             font-size: 24px;
-            color: #666;
-            margin-top: 0;
         }
-        .email, .social {
-            margin-top: 30px;
+        h2 {
+            margin: 0 0 15px 0;
+            font-size: 18px;
+            font-weight: normal;
         }
-        .email a, .social a {
-            color: #007bff;
+        p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        a {
+            color: #4da6ff;
             text-decoration: none;
-            cursor: pointer;
         }
-        .email a:hover, .social a:hover {
-            text-decoration: underline;
+        @keyframes float {
+            0% { transform: translate(-50%, -50%) translateY(0px); }
+            50% { transform: translate(-50%, -50%) translateY(-20px); }
+            100% { transform: translate(-50%, -50%) translateY(0px); }
         }
-        .social a {
-            margin-right: 15px;
+        @keyframes precess {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            25% { transform: translate(-50%, -50%) rotate(5deg); }
+            50% { transform: translate(-50%, -50%) rotate(0deg); }
+            75% { transform: translate(-50%, -50%) rotate(-5deg); }
+            100% { transform: translate(-50%, -50%) rotate(0deg); }
         }
     </style>
 </head>
 <body>
-    <div class="container">
+    <canvas id="space"></canvas>
+    <div class="card">
         <h1>Simon Vans-Colina</h1>
-        <hr>
-        <h3>CTO and Co-Founder Pave Bank</h3>
-        <div class="email">
-            <a onclick="copyEmail('simon@vans-colina.com')">simon@vans-colina.com</a><br><br>
-            <a onclick="copyEmail('simon@pavebank.com')">simon@pavebank.com</a>
-        </div>
-        <div class="social">
-            <a href="https://twitter.com/simonvc" target="_blank">Twitter: @simonvc</a>
-            <a href="https://t.me/simonvc" target="_blank">Telegram: @simonvc</a>
-        </div>
+        <h2>CTO and Co-Founder Pave Bank</h2>
+        <p><a href="mailto:simon@vans-colina.com">simon@vans-colina.com</a></p>
+        <p><a href="mailto:simon@pavebank.com">simon@pavebank.com</a></p>
+        <p>Twitter: <a href="https://twitter.com/simonvc">@simonvc</a></p>
+        <p>Telegram: <a href="https://t.me/simonvc">@simonvc</a></p>
     </div>
     <script>
-        function copyEmail(email) {
-            navigator.clipboard.writeText(email).then(() => {
-                alert('Email address copied to clipboard!');
-            }, (err) => {
-                console.error('Could not copy email: ', err);
-            });
+        const canvas = document.getElementById('space');
+        const ctx = canvas.getContext('2d');
+
+        let particles = [];
+        let connections = [];
+        const particleCount = 40;
+        const connectionCount = 20;
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2 + 1;
+                this.speedX = Math.random() * 0.5 - 0.25;
+                this.speedY = Math.random() * 0.5 - 0.25;
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                if (this.x < 0 || this.x > canvas.width) this.speedX *= -1;
+                if (this.y < 0 || this.y > canvas.height) this.speedY *= -1;
+            }
+            draw() {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
+
+        function init() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            particles = [];
+            connections = [];
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new Particle());
+            }
+            for (let i = 0; i < connectionCount; i++) {
+                addConnection();
+            }
+        }
+
+        function addConnection() {
+            let start, end;
+            if (connections.length === 0) {
+                start = Math.floor(Math.random() * particleCount);
+                end = Math.floor(Math.random() * particleCount);
+            } else {
+                const randomConnection = connections[Math.floor(Math.random() * connections.length)];
+                start = Math.random() < 0.5 ? randomConnection.start : randomConnection.end;
+                if (Math.random() < 0.5) {
+                    end = getConnectedPoint();
+                } else {
+                    do {
+                        end = Math.floor(Math.random() * particleCount);
+                    } while (end === start);
+                }
+            }
+            connections.push({ start, end });
+        }
+
+        function getConnectedPoint() {
+            const connectedPoints = new Set(connections.flatMap(c => [c.start, c.end]));
+            const availablePoints = Array.from(connectedPoints);
+            return availablePoints[Math.floor(Math.random() * availablePoints.length)];
+        }
+
+        function updateConnections() {
+            if (connections.length > 0) {
+                connections.shift();
+                addConnection();
+            }
+        }
+
+        function drawConnections() {
+            ctx.strokeStyle = 'rgba(0, 100, 255, 0.5)';
+            ctx.lineWidth = 0.5;
+            for (let connection of connections) {
+                const start = particles[connection.start];
+                const end = particles[connection.end];
+                ctx.beginPath();
+                ctx.moveTo(start.x, start.y);
+                ctx.lineTo(end.x, end.y);
+                ctx.stroke();
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let particle of particles) {
+                particle.update();
+                particle.draw();
+            }
+            drawConnections();
+            requestAnimationFrame(animate);
+        }
+
+        init();
+        animate();
+        setInterval(updateConnections, 1000);
+
+        window.addEventListener('resize', init);
     </script>
 </body>
 </html>
