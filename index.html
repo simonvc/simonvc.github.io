@@ -85,6 +85,11 @@
             width: 100%;
             text-align: center;
         }
+        @keyframes lightning {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
     </style>
 </head>
 <body>
@@ -175,9 +180,36 @@
             }
         }
 
+        let lastFlashTime = 0;
+
         function drawConnections() {
-            ctx.strokeStyle = 'rgba(0, 100, 255, 0.5)';
-            ctx.lineWidth = 0.5;
+            ctx.strokeStyle = 'rgba(0, 100, 255, 0.7)';
+            ctx.lineWidth = 1.5;
+            
+            const currentTime = Date.now();
+            const timeSinceLastFlash = currentTime - lastFlashTime;
+            
+            // Check if enough time has passed for a potential flash (1-3 seconds)
+            if (timeSinceLastFlash > 1000 + Math.random() * 2000) {
+                // 10% chance to actually flash when the time condition is met
+                if (Math.random() < 0.1) {
+                    const flashConnection = connections[Math.floor(Math.random() * connections.length)];
+                    const start = particles[flashConnection.start];
+                    const end = particles[flashConnection.end];
+                    
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(start.x, start.y);
+                    ctx.lineTo(end.x, end.y);
+                    ctx.stroke();
+                    ctx.restore();
+                    
+                    lastFlashTime = currentTime;
+                }
+            }
+
             for (let connection of connections) {
                 const start = particles[connection.start];
                 const end = particles[connection.end];
