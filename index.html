@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Simon Vans-Colina - Business Card</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         body, html {
             margin: 0;
@@ -14,12 +15,21 @@
             background-color: #000;
             color: #fff;
         }
-        #space {
+        #scene {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
+            z-index: 1;
+        }
+        #matrix {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
         }
         .card {
             position: absolute;
@@ -27,42 +37,96 @@
             left: 50%;
             transform: translate(-50%, -50%);
             width: 300px;
-            height: 180px;
-            background-color: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
-            animation: float 6s ease-in-out infinite, precess 20s linear infinite;
+            height: auto;
+            background-color: rgba(0, 20, 40, 0.1);
+            backdrop-filter: blur(8px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 
+                0 0 40px rgba(0, 150, 255, 0.1),
+                inset 0 0 25px rgba(0, 150, 255, 0.05);
+            border: 1px solid rgba(77, 166, 255, 0.15);
+            transition: all 0.3s ease;
+            background-image: linear-gradient(
+                135deg,
+                rgba(255, 255, 255, 0.05) 0%,
+                rgba(0, 150, 255, 0.05) 100%
+            );
+            z-index: 1000;
         }
         h1 {
             margin: 0 0 10px 0;
             font-size: 24px;
+            background: linear-gradient(45deg, #fff, #4da6ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 15px rgba(77, 166, 255, 0.5);
+            position: relative;
+        }
+        h1::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            bottom: -2px;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(77, 166, 255, 0.5),
+                transparent
+            );
         }
         h2 {
             margin: 0 0 15px 0;
             font-size: 18px;
             font-weight: normal;
+            color: rgba(77, 166, 255, 0.9);
+            text-shadow: 0 0 10px rgba(77, 166, 255, 0.5);
         }
         p {
             margin: 5px 0;
             font-size: 14px;
+            text-shadow: 
+                0 0 10px rgba(0, 0, 0, 0.5),
+                0 0 15px rgba(255, 255, 255, 0.3);
+            color: rgba(255, 255, 255, 0.95);
+            letter-spacing: 0.3px;
         }
         a {
-            color: #4da6ff;
+            color: rgba(77, 166, 255, 0.9);
             text-decoration: none;
             cursor: pointer;
+            transition: all 0.3s ease;
+            text-shadow: 
+                0 0 8px rgba(77, 166, 255, 0.4),
+                0 0 12px rgba(255, 255, 255, 0.2);
+            position: relative;
         }
-        @keyframes float {
-            0% { transform: translate(-50%, -50%) translateY(0px); }
-            50% { transform: translate(-50%, -50%) translateY(-20px); }
-            100% { transform: translate(-50%, -50%) translateY(0px); }
+        a:hover {
+            color: #fff;
+            text-shadow: 
+                0 0 10px rgba(77, 166, 255, 0.8),
+                0 0 20px rgba(77, 166, 255, 0.4);
+            letter-spacing: 0.8px;
         }
-        @keyframes precess {
-            0% { transform: translate(-50%, -50%) rotate(0deg); }
-            25% { transform: translate(-50%, -50%) rotate(5deg); }
-            50% { transform: translate(-50%, -50%) rotate(0deg); }
-            75% { transform: translate(-50%, -50%) rotate(-5deg); }
-            100% { transform: translate(-50%, -50%) rotate(0deg); }
+        a::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            bottom: -1px;
+            width: 0;
+            height: 1px;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(77, 166, 255, 0.5),
+                transparent
+            );
+            transition: width 0.3s ease;
+        }
+        a:hover::after {
+            width: 100%;
         }
         #flash {
             position: fixed;
@@ -70,30 +134,22 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: white;
+            background-color: rgba(0, 150, 255, 0.2);
+            backdrop-filter: blur(5px);
             display: flex;
             justify-content: center;
             align-items: center;
             font-size: 48px;
             font-weight: bold;
-            color: black;
+            color: #fff;
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.1s ease-in-out;
         }
-        #flash span {
-            width: 100%;
-            text-align: center;
-        }
-        @keyframes lightning {
-            0% { opacity: 0.5; }
-            50% { opacity: 1; }
-            100% { opacity: 0.5; }
-        }
     </style>
 </head>
 <body>
-    <canvas id="space"></canvas>
+    <canvas id="scene"></canvas>
     <div class="card">
         <h1>Simon Vans-Colina</h1>
         <h2>CTO and Co-Founder Pave Bank</h2>
@@ -106,129 +162,112 @@
     </div>
     <div id="flash"><span>COPIED</span></div>
     <script>
-        const canvas = document.getElementById('space');
-        const ctx = canvas.getContext('2d');
-
-        let particles = [];
-        let connections = [];
-        const particleCount = 40;
-        const connectionCount = 20;
-
-        class Particle {
-            constructor() {
-                this.x = Math.random() * canvas.width;
-                this.y = Math.random() * canvas.height;
-                this.size = Math.random() * 2 + 1;
-                this.speedX = Math.random() * 0.5 - 0.25;
-                this.speedY = Math.random() * 0.5 - 0.25;
-            }
-            update() {
-                this.x += this.speedX;
-                this.y += this.speedY;
-                if (this.x < 0 || this.x > canvas.width) this.speedX *= -1;
-                if (this.y < 0 || this.y > canvas.height) this.speedY *= -1;
-            }
-            draw() {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
+        let scene, camera, renderer, geometry, material, points;
+        let nodes = [];
+        let edges = [];
+        const nodeCount = 100;
+        const maxConnections = 150;
 
         function init() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            particles = [];
-            connections = [];
-            for (let i = 0; i < particleCount; i++) {
-                particles.push(new Particle());
-            }
-            for (let i = 0; i < connectionCount; i++) {
-                addConnection();
-            }
-        }
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('scene'), antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
 
-        function addConnection() {
-            let start, end;
-            if (connections.length === 0) {
-                start = Math.floor(Math.random() * particleCount);
-                end = Math.floor(Math.random() * particleCount);
-            } else {
-                const randomConnection = connections[Math.floor(Math.random() * connections.length)];
-                start = Math.random() < 0.5 ? randomConnection.start : randomConnection.end;
-                if (Math.random() < 0.5) {
-                    end = getConnectedPoint();
-                } else {
-                    do {
-                        end = Math.floor(Math.random() * particleCount);
-                    } while (end === start);
-                }
-            }
-            connections.push({ start, end });
-        }
+            // Create nodes
+            const nodeGeometry = new THREE.SphereGeometry(0.1, 16, 16);
+            const nodeMaterial = new THREE.MeshBasicMaterial({
+                color: 0x4da6ff,
+                transparent: true,
+                opacity: 0.6
+            });
 
-        function getConnectedPoint() {
-            const connectedPoints = new Set(connections.flatMap(c => [c.start, c.end]));
-            const availablePoints = Array.from(connectedPoints);
-            return availablePoints[Math.floor(Math.random() * availablePoints.length)];
-        }
-
-        function updateConnections() {
-            if (connections.length > 0) {
-                connections.shift();
-                addConnection();
-            }
-        }
-
-        let lastFlashTime = 0;
-
-        function drawConnections() {
-            ctx.strokeStyle = 'rgba(0, 100, 255, 0.7)';
-            ctx.lineWidth = 1.5;
-            
-            const currentTime = Date.now();
-            const timeSinceLastFlash = currentTime - lastFlashTime;
-            
-            // Check if enough time has passed for a potential flash (1-3 seconds)
-            if (timeSinceLastFlash > 1000 + Math.random() * 2000) {
-                // 10% chance to actually flash when the time condition is met
-                if (Math.random() < 0.1) {
-                    const flashConnection = connections[Math.floor(Math.random() * connections.length)];
-                    const start = particles[flashConnection.start];
-                    const end = particles[flashConnection.end];
-                    
-                    ctx.save();
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-                    ctx.lineWidth = 3;
-                    ctx.beginPath();
-                    ctx.moveTo(start.x, start.y);
-                    ctx.lineTo(end.x, end.y);
-                    ctx.stroke();
-                    ctx.restore();
-                    
-                    lastFlashTime = currentTime;
-                }
+            for (let i = 0; i < nodeCount; i++) {
+                const node = new THREE.Mesh(nodeGeometry, nodeMaterial);
+                node.position.set(
+                    (Math.random() - 0.5) * 10,
+                    (Math.random() - 0.5) * 10,
+                    (Math.random() - 0.5) * 10
+                );
+                node.velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 0.02,
+                    (Math.random() - 0.5) * 0.02,
+                    (Math.random() - 0.5) * 0.02
+                );
+                nodes.push(node);
+                scene.add(node);
             }
 
-            for (let connection of connections) {
-                const start = particles[connection.start];
-                const end = particles[connection.end];
-                ctx.beginPath();
-                ctx.moveTo(start.x, start.y);
-                ctx.lineTo(end.x, end.y);
-                ctx.stroke();
+            // Create edges
+            const edgeMaterial = new THREE.LineBasicMaterial({
+                color: 0x4da6ff,
+                transparent: true,
+                opacity: 0.3
+            });
+
+            for (let i = 0; i < maxConnections; i++) {
+                const start = nodes[Math.floor(Math.random() * nodes.length)];
+                const end = nodes[Math.floor(Math.random() * nodes.length)];
+                
+                const points = [];
+                points.push(start.position);
+                points.push(end.position);
+                
+                const edgeGeometry = new THREE.BufferGeometry().setFromPoints(points);
+                const edge = new THREE.Line(edgeGeometry, edgeMaterial);
+                edges.push({ line: edge, start, end });
+                scene.add(edge);
             }
+
+            // Add ambient light
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+
+            // Add point lights
+            const pointLight1 = new THREE.PointLight(0x4da6ff, 1, 100);
+            pointLight1.position.set(5, 5, 5);
+            scene.add(pointLight1);
+
+            const pointLight2 = new THREE.PointLight(0x0066cc, 1, 100);
+            pointLight2.position.set(-5, -5, -5);
+            scene.add(pointLight2);
+
+            camera.position.z = 15;
         }
 
         function animate() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            for (let particle of particles) {
-                particle.update();
-                particle.draw();
-            }
-            drawConnections();
             requestAnimationFrame(animate);
+
+            // Update nodes
+            nodes.forEach(node => {
+                node.position.add(node.velocity);
+
+                // Bounce off boundaries
+                ['x', 'y', 'z'].forEach(axis => {
+                    if (Math.abs(node.position[axis]) > 5) {
+                        node.velocity[axis] *= -1;
+                    }
+                });
+            });
+
+            // Update edges
+            edges.forEach(edge => {
+                edge.line.geometry.setFromPoints([edge.start.position, edge.end.position]);
+                edge.line.geometry.verticesNeedUpdate = true;
+            });
+
+            // Rotate entire scene
+            scene.rotation.x += 0.001;
+            scene.rotation.y += 0.002;
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
         function copyToClipboard(text) {
@@ -245,9 +284,8 @@
 
         init();
         animate();
-        setInterval(updateConnections, 1000);
 
-        window.addEventListener('resize', init);
+        window.addEventListener('resize', onWindowResize);
     </script>
 </body>
 </html>
