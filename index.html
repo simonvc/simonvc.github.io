@@ -161,70 +161,22 @@
         <p>vCard File: <a href="https://simon.vc/SimonVans-Colina.vcf">Save vCard File</a></p>
     </div>
     <div id="flash"><span>COPIED</span></div>
-   <body>
-    <canvas id="scene"></canvas>
-    <!-- ... [Unchanged body content] ... -->
-   <script>
-        let scene, camera, renderer, controls;
+    <script>
+        let scene, camera, renderer, geometry, material, points;
+        let nodes = [];
+        let edges = [];
         const nodeCount = 100;
-        const baseRadius = 10;
-        const axesCount = 7;
-        const axes = [];
-        const nodes = [];
-        const edges = [];
-        const edgeMaterial = new THREE.LineBasicMaterial({
-            color: 0x4da6ff,
-            transparent: true,
-            opacity: 0.3
-        });
+        const maxConnections = 150;
 
         function init() {
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(
-                75,
-                window.innerWidth / window.innerHeight,
-                0.1,
-                1000
-            );
-            renderer = new THREE.WebGLRenderer({
-                canvas: document.getElementById('scene'),
-                antialias: true
-            });
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('scene'), antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
 
-            // Initialize OrbitControls
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
-            controls.enablePan = false;
-
-            // Initialize axes
-            for (let i = 0; i < axesCount; i++) {
-                const direction = new THREE.Vector3(
-                    Math.random() - 0.5,
-                    Math.random() - 0.5,
-                    Math.random() - 0.5
-                ).normalize();
-                const length =
-                    baseRadius *
-                    (0.25 + Math.random() * 0.5); // Between 25% and 75% of baseRadius
-                const rotationVelocity = new THREE.Vector3(
-                    (Math.random() - 0.5) * 0.005, // Reduced rotation speed
-                    (Math.random() - 0.5) * 0.005,
-                    (Math.random() - 0.5) * 0.005
-                );
-                const lengthVelocity = (Math.random() - 0.5) * 0.01; // Reduced length change speed
-                axes.push({
-                    direction,
-                    length,
-                    rotationVelocity,
-                    lengthVelocity
-                });
-            }
-
-            // Initialize nodes
-            const nodeGeometry = new THREE.SphereGeometry(0.2, 16, 16);
+            // Create nodes
+            const nodeGeometry = new THREE.SphereGeometry(0.1, 16, 16);
             const nodeMaterial = new THREE.MeshBasicMaterial({
                 color: 0x4da6ff,
                 transparent: true,
@@ -232,13 +184,40 @@
             });
 
             for (let i = 0; i < nodeCount; i++) {
-                const theta = Math.random() * Math.PI * 2;
-                const phi = Math.acos(2 * Math.random() - 1);
                 const node = new THREE.Mesh(nodeGeometry, nodeMaterial);
-                node.userData.theta = theta;
-                node.userData.phi = phi;
+                node.position.set(
+                    (Math.random() - 0.5) * 10,
+                    (Math.random() - 0.5) * 10,
+                    (Math.random() - 0.5) * 10
+                );
+                node.velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 0.02,
+                    (Math.random() - 0.5) * 0.02,
+                    (Math.random() - 0.5) * 0.02
+                );
                 nodes.push(node);
                 scene.add(node);
+            }
+
+            // Create edges
+            const edgeMaterial = new THREE.LineBasicMaterial({
+                color: 0x4da6ff,
+                transparent: true,
+                opacity: 0.3
+            });
+
+            for (let i = 0; i < maxConnections; i++) {
+                const start = nodes[Math.floor(Math.random() * nodes.length)];
+                const end = nodes[Math.floor(Math.random() * nodes.length)];
+                
+                const points = [];
+                points.push(start.position);
+                points.push(end.position);
+                
+                const edgeGeometry = new THREE.BufferGeometry().setFromPoints(points);
+                const edge = new THREE.Line(edgeGeometry, edgeMaterial);
+                edges.push({ line: edge, start, end });
+                scene.add(edge);
             }
 
             // Add ambient light
@@ -254,94 +233,33 @@
             pointLight2.position.set(-5, -5, -5);
             scene.add(pointLight2);
 
-            camera.position.z = 30;
+            camera.position.z = 15;
         }
 
         function animate() {
             requestAnimationFrame(animate);
 
-            // Update axes
-            axes.forEach(axis => {
-                // Rotate axis direction
-                const rotationMatrix = new THREE.Matrix4().makeRotationFromEuler(
-                    new THREE.Euler(
-                        axis.rotationVelocity.x,
-                        axis.rotationVelocity.y,
-                        axis.rotationVelocity.z
-                    )
-                );
-                axis.direction.applyMatrix4(rotationMatrix).normalize();
-
-                // Update length with random walk
-                axis.length += axis.lengthVelocity;
-                if (axis.length > baseRadius * 0.75 || axis.length < baseRadius * 0.25) {
-                    axis.lengthVelocity *= -1;
-                }
-            });
-
             // Update nodes
             nodes.forEach(node => {
-                // Drift over the surface with less jiggle
-                node.userData.theta += (Math.random() - 0.5) * 0.002; // Reduced drift speed
-                node.userData.phi += (Math.random() - 0.5) * 0.002;
+                node.position.add(node.velocity);
 
-                // Keep phi within valid range
-                if (node.userData.phi < 0) node.userData.phi = 0;
-                if (node.userData.phi > Math.PI) node.userData.phi = Math.PI;
-
-                // Compute point direction
-                const sinPhi = Math.sin(node.userData.phi);
-                const pointDirection = new THREE.Vector3(
-                    Math.cos(node.userData.theta) * sinPhi,
-                    Math.sin(node.userData.theta) * sinPhi,
-                    Math.cos(node.userData.phi)
-                );
-
-                // Compute deformation
-                let deltaR = 0;
-                axes.forEach(axis => {
-                    const dotProduct = axis.direction.dot(pointDirection);
-                    deltaR += axis.length * dotProduct;
+                // Bounce off boundaries
+                ['x', 'y', 'z'].forEach(axis => {
+                    if (Math.abs(node.position[axis]) > 5) {
+                        node.velocity[axis] *= -1;
+                    }
                 });
-
-                const radius = baseRadius + deltaR * 0.1; // Scale deformation
-                node.position.copy(pointDirection.multiplyScalar(radius));
             });
 
             // Update edges
-            // Remove existing edges
             edges.forEach(edge => {
-                scene.remove(edge);
-            });
-            edges.length = 0;
-
-            // Compute nearest neighbors and create edges
-            nodes.forEach(node => {
-                const distances = [];
-                nodes.forEach(otherNode => {
-                    if (node !== otherNode) {
-                        const distance = node.position.distanceToSquared(otherNode.position);
-                        distances.push({ node: otherNode, distance });
-                    }
-                });
-                distances.sort((a, b) => a.distance - b.distance);
-                for (let i = 0; i < 5; i++) {
-                    const neighbor = distances[i].node;
-                    const edgeGeometry = new THREE.BufferGeometry().setFromPoints([
-                        node.position,
-                        neighbor.position
-                    ]);
-                    const edge = new THREE.Line(edgeGeometry, edgeMaterial);
-                    edges.push(edge);
-                    scene.add(edge);
-                }
+                edge.line.geometry.setFromPoints([edge.start.position, edge.end.position]);
+                edge.line.geometry.verticesNeedUpdate = true;
             });
 
-            // Remove automatic rotation
-            // scene.rotation.y += 0.002;
-
-            // Update controls
-            controls.update();
+            // Rotate entire scene
+            scene.rotation.x += 0.001;
+            scene.rotation.y += 0.002;
 
             renderer.render(scene, camera);
         }
@@ -353,18 +271,15 @@
         }
 
         function copyToClipboard(text) {
-            navigator.clipboard
-                .writeText(text)
-                .then(() => {
-                    const flash = document.getElementById('flash');
-                    flash.style.opacity = '1';
-                    setTimeout(() => {
-                        flash.style.opacity = '0';
-                    }, 250);
-                })
-                .catch(err => {
-                    console.error('Failed to copy: ', err);
-                });
+            navigator.clipboard.writeText(text).then(() => {
+                const flash = document.getElementById('flash');
+                flash.style.opacity = '1';
+                setTimeout(() => {
+                    flash.style.opacity = '0';
+                }, 250);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+            });
         }
 
         init();
