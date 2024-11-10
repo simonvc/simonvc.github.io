@@ -164,8 +164,8 @@
    <body>
     <canvas id="scene"></canvas>
     <!-- ... [Unchanged body content] ... -->
-    <script>
-        let scene, camera, renderer;
+   <script>
+        let scene, camera, renderer, controls;
         const nodeCount = 100;
         const baseRadius = 10;
         const axesCount = 7;
@@ -193,6 +193,12 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
 
+            // Initialize OrbitControls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.enablePan = false;
+
             // Initialize axes
             for (let i = 0; i < axesCount; i++) {
                 const direction = new THREE.Vector3(
@@ -204,11 +210,11 @@
                     baseRadius *
                     (0.25 + Math.random() * 0.5); // Between 25% and 75% of baseRadius
                 const rotationVelocity = new THREE.Vector3(
-                    (Math.random() - 0.5) * 0.01,
-                    (Math.random() - 0.5) * 0.01,
-                    (Math.random() - 0.5) * 0.01
+                    (Math.random() - 0.5) * 0.005, // Reduced rotation speed
+                    (Math.random() - 0.5) * 0.005,
+                    (Math.random() - 0.5) * 0.005
                 );
-                const lengthVelocity = (Math.random() - 0.5) * 0.02;
+                const lengthVelocity = (Math.random() - 0.5) * 0.01; // Reduced length change speed
                 axes.push({
                     direction,
                     length,
@@ -275,9 +281,9 @@
 
             // Update nodes
             nodes.forEach(node => {
-                // Drift over the surface
-                node.userData.theta += (Math.random() - 0.5) * 0.01;
-                node.userData.phi += (Math.random() - 0.5) * 0.01;
+                // Drift over the surface with less jiggle
+                node.userData.theta += (Math.random() - 0.5) * 0.002; // Reduced drift speed
+                node.userData.phi += (Math.random() - 0.5) * 0.002;
 
                 // Keep phi within valid range
                 if (node.userData.phi < 0) node.userData.phi = 0;
@@ -314,7 +320,7 @@
                 const distances = [];
                 nodes.forEach(otherNode => {
                     if (node !== otherNode) {
-                        const distance = node.position.distanceTo(otherNode.position);
+                        const distance = node.position.distanceToSquared(otherNode.position);
                         distances.push({ node: otherNode, distance });
                     }
                 });
@@ -331,8 +337,11 @@
                 }
             });
 
-            // Rotate entire scene
-            scene.rotation.y += 0.002;
+            // Remove automatic rotation
+            // scene.rotation.y += 0.002;
+
+            // Update controls
+            controls.update();
 
             renderer.render(scene, camera);
         }
