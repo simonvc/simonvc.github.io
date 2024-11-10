@@ -23,6 +23,23 @@
             height: 100%;
             z-index: 1;
         }
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-color: #000;
+            color: #fff;
+        }
+        #scene {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
         #matrix {
             position: fixed;
             top: 0;
@@ -162,11 +179,104 @@
     </div>
     <div id="flash"><span>COPIED</span></div>
     <script>
-        let scene, camera, renderer, geometry, material, points;
+        let scene, camera, renderer;
+        let targetRotation = new THREE.Vector2(0, 0);
+        let currentRotation = new THREE.Vector2(0, 0);
+        let rotationVelocity = new THREE.Vector2(0, 0);
+        let mouseVelocity = new THREE.Vector2(0, 0);
+        let lastMousePosition = new THREE.Vector2(0, 0);
+        let currentMousePosition = new THREE.Vector2(0, 0);
+        let lastUpdateTime = Date.now();
+        let isMouseInScene = false;
         let nodes = [];
         let edges = [];
+        let axes = [];
         const nodeCount = 100;
-        const maxConnections = 150;
+        const axesCount = 7;
+        const baseRadius = 5;
+        const minScale = 0.75;
+        const maxScale = 1.25;
+
+        class DeformationAxis {
+            constructor() {
+                this.direction = new THREE.Vector3(
+                    Math.random() - 0.5,
+                    Math.random() - 0.5,
+                    Math.random() - 0.5
+                ).normalize();
+                this.scale = 1.0;
+                this.scaleVelocity = 0;
+                this.rotation = new THREE.Quaternion();
+                // Reduced rotation velocity by 90%
+                this.rotationVelocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 0.002,
+                    (Math.random() - 0.5) * 0.002,
+                    (Math.random() - 0.5) * 0.002
+                );
+            }
+
+            update() {
+                // Update scale with random walk (slowed down)
+                this.scaleVelocity += (Math.random() - 0.5) * 0.001;
+                this.scaleVelocity *= 0.98; // Damping
+                this.scale += this.scaleVelocity;
+                
+                // Bound scale
+                if (this.scale < minScale) {
+                    this.scale = minScale;
+                    this.scaleVelocity *= -0.5;
+                }
+                if (this.scale > maxScale) {
+                    this.scale = maxScale;
+                    this.scaleVelocity *= -0.5;
+                }
+
+                // Update rotation (slower)
+                const rotationDelta = new THREE.Quaternion().setFromEuler(
+                    new THREE.Euler(
+                        this.rotationVelocity.x,
+                        this.rotationVelocity.y,
+                        this.rotationVelocity.z
+                    )
+                );
+                this.rotation.multiply(rotationDelta);
+                this.direction.applyQuaternion(rotationDelta);
+            }
+        }
+
+        class Node {
+            constructor(theta, phi, geometry, material) {
+                this.mesh = new THREE.Mesh(geometry, material);
+                this.theta = theta;
+                this.phi = phi;
+                this.connections = new Set(); // Store connected nodes
+                this.velocity = new THREE.Vector2(
+                    (Math.random() - 0.5) * 0.002, // Slower movement
+                    (Math.random() - 0.5) * 0.002
+                );
+            }
+
+            addConnection(node) {
+                this.connections.add(node);
+                node.connections.add(this);
+            }
+        }
+
+        function calculateSurfacePoint(theta, phi, axes) {
+            let point = new THREE.Vector3(
+                baseRadius * Math.sin(phi) * Math.cos(theta),
+                baseRadius * Math.sin(phi) * Math.sin(theta),
+                baseRadius * Math.cos(phi)
+            );
+
+            // Apply deformation from each axis
+            axes.forEach(axis => {
+                const influence = Math.pow(Math.max(0, point.dot(axis.direction) / baseRadius), 2);
+                point.add(axis.direction.clone().multiplyScalar(influence * (axis.scale - 1) * baseRadius));
+            });
+
+            return point;
+        }
 
         function init() {
             scene = new THREE.Scene();
@@ -174,6 +284,11 @@
             renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('scene'), antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
+
+            // Create deformation axes
+            for (let i = 0; i < axesCount; i++) {
+                axes.push(new DeformationAxis());
+            }
 
             // Create nodes
             const nodeGeometry = new THREE.SphereGeometry(0.1, 16, 16);
@@ -183,21 +298,31 @@
                 opacity: 0.6
             });
 
+            // Create nodes with evenly distributed initial positions
             for (let i = 0; i < nodeCount; i++) {
-                const node = new THREE.Mesh(nodeGeometry, nodeMaterial);
-                node.position.set(
-                    (Math.random() - 0.5) * 10,
-                    (Math.random() - 0.5) * 10,
-                    (Math.random() - 0.5) * 10
-                );
-                node.velocity = new THREE.Vector3(
-                    (Math.random() - 0.5) * 0.02,
-                    (Math.random() - 0.5) * 0.02,
-                    (Math.random() - 0.5) * 0.02
-                );
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1); // Better distribution
+                
+                const node = new Node(theta, phi, nodeGeometry, nodeMaterial);
+                node.mesh.position.copy(calculateSurfacePoint(theta, phi, axes));
                 nodes.push(node);
-                scene.add(node);
+                scene.add(node.mesh);
             }
+
+            // Create initial connections (each node connects to 5 nearest neighbors)
+            nodes.forEach(node => {
+                const otherNodes = nodes.filter(n => n !== node);
+                const distances = otherNodes.map(other => ({
+                    node: other,
+                    distance: node.mesh.position.distanceTo(other.mesh.position)
+                }))
+                .sort((a, b) => a.distance - b.distance)
+                .slice(0, 5);
+
+                distances.forEach(({ node: other }) => {
+                    node.addConnection(other);
+                });
+            });
 
             // Create edges
             const edgeMaterial = new THREE.LineBasicMaterial({
@@ -206,25 +331,24 @@
                 opacity: 0.3
             });
 
-            for (let i = 0; i < maxConnections; i++) {
-                const start = nodes[Math.floor(Math.random() * nodes.length)];
-                const end = nodes[Math.floor(Math.random() * nodes.length)];
-                
-                const points = [];
-                points.push(start.position);
-                points.push(end.position);
-                
-                const edgeGeometry = new THREE.BufferGeometry().setFromPoints(points);
-                const edge = new THREE.Line(edgeGeometry, edgeMaterial);
-                edges.push({ line: edge, start, end });
-                scene.add(edge);
-            }
+            // Create initial edges
+            nodes.forEach(node => {
+                node.connections.forEach(other => {
+                    const geometry = new THREE.BufferGeometry();
+                    const edge = new THREE.Line(geometry, edgeMaterial);
+                    edges.push({
+                        line: edge,
+                        start: node,
+                        end: other
+                    });
+                    scene.add(edge);
+                });
+            });
 
-            // Add ambient light
+            // Add lights
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
 
-            // Add point lights
             const pointLight1 = new THREE.PointLight(0x4da6ff, 1, 100);
             pointLight1.position.set(5, 5, 5);
             scene.add(pointLight1);
@@ -239,27 +363,86 @@
         function animate() {
             requestAnimationFrame(animate);
 
+            // Update axes
+            axes.forEach(axis => axis.update());
+
             // Update nodes
             nodes.forEach(node => {
-                node.position.add(node.velocity);
+                // Update surface position with bounded velocity
+                node.theta += node.velocity.x;
+                node.phi += node.velocity.y;
 
-                // Bounce off boundaries
-                ['x', 'y', 'z'].forEach(axis => {
-                    if (Math.abs(node.position[axis]) > 5) {
-                        node.velocity[axis] *= -1;
+                // Ensure phi stays within valid range (avoid poles)
+                node.phi = Math.max(0.2, Math.min(Math.PI - 0.2, node.phi));
+                
+                // Wrap theta around
+                node.theta = (node.theta + Math.PI * 2) % (Math.PI * 2);
+
+                // Apply small random adjustments to prevent clustering
+                if (Math.random() < 0.05) { // 5% chance per frame
+                    node.velocity.x += (Math.random() - 0.5) * 0.0002;
+                    node.velocity.y += (Math.random() - 0.5) * 0.0002;
+                }
+
+                // Dampen velocity
+                node.velocity.multiplyScalar(0.99);
+
+                // Enforce maximum velocity
+                const maxVelocity = 0.001;
+                if (node.velocity.length() > maxVelocity) {
+                    node.velocity.normalize().multiplyScalar(maxVelocity);
+                }
+
+                // Add slight repulsion between nearby nodes
+                nodes.forEach(otherNode => {
+                    if (otherNode !== node) {
+                        const dx = otherNode.mesh.position.x - node.mesh.position.x;
+                        const dy = otherNode.mesh.position.y - node.mesh.position.y;
+                        const dz = otherNode.mesh.position.z - node.mesh.position.z;
+                        const distSq = dx * dx + dy * dy + dz * dz;
+                        
+                        if (distSq < 1) { // Only repel if nodes are close
+                            const repulsionForce = 0.00001 / (distSq + 0.1);
+                            node.velocity.x -= dx * repulsionForce;
+                            node.velocity.y -= dy * repulsionForce;
+                        }
                     }
                 });
+
+                // Update position
+                node.mesh.position.copy(calculateSurfacePoint(node.theta, node.phi, axes));
             });
 
             // Update edges
             edges.forEach(edge => {
-                edge.line.geometry.setFromPoints([edge.start.position, edge.end.position]);
+                const points = [
+                    edge.start.mesh.position,
+                    edge.end.mesh.position
+                ];
+                edge.line.geometry.setFromPoints(points);
                 edge.line.geometry.verticesNeedUpdate = true;
             });
 
-            // Rotate entire scene
-            scene.rotation.x += 0.001;
-            scene.rotation.y += 0.002;
+            // Calculate time delta
+            const currentTime = Date.now();
+            const deltaTime = (currentTime - lastUpdateTime) / 1000; // Convert to seconds
+            lastUpdateTime = currentTime;
+
+            // Apply smoothing to the rotation with deltaTime
+            const smoothFactor = Math.min(1, deltaTime * 3); // Reduced smoothing speed
+            rotationVelocity.x += (targetRotation.x - currentRotation.x) * smoothFactor;
+            rotationVelocity.y += (targetRotation.y - currentRotation.y) * smoothFactor;
+            
+            // Strong damping
+            const dampingFactor = Math.pow(0.98, deltaTime * 60);
+            rotationVelocity.multiplyScalar(dampingFactor);
+            
+            // Update current rotation
+            currentRotation.add(rotationVelocity);
+
+            // Apply rotation to scene
+            scene.rotation.y = currentRotation.x;
+            scene.rotation.x = currentRotation.y;
 
             renderer.render(scene, camera);
         }
@@ -286,6 +469,7 @@
         animate();
 
         window.addEventListener('resize', onWindowResize);
+
     </script>
 </body>
 </html>
