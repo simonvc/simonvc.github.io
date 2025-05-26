@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toddler Shape Sorter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overscroll-behavior: none; /* Prevents pull-to-refresh */
+            touch-action: none; /* Prevents default touch actions like scrolling */
+        }
+        .target-shape-area, .draggable-shapes-container {
+            -webkit-user-select: none; /* Safari */
+            -ms-user-select: none; /* IE 10 and IE 11 */
+            user-select: none; /* Standard syntax */
+        }
+        .shape {
+            width: 80px;
+            height: 80px;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: absolute; /* For dragging */
+            transition: transform 0.1s ease-out, opacity 0.3s ease;
+        }
+        .shape.dragging {
+            cursor: grabbing;
+            z-index: 1000;
+            transform: scale(1.1);
+        }
+        .target-shape svg {
+            width: 100px;
+            height: 100px;
+        }
+        #game-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* Important for fullscreen and layout, clips confetti outside */
+            position: relative; /* Needed for absolute positioning of the visual divider */
+        }
+        .top-panel {
+            display: flex;
+            height: 25%; 
+            border-bottom: 2px solid #e5e7eb; /* gray-200, acts as part of the top horizontal division */
+            position: relative; /* Ensure z-index works if needed */
+            z-index: 1; /* Above the main vertical divider */
+        }
+        .column { /* This is for left-column and right-column in top-panel */
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative; 
+            background-color: #f9fafb; /* bg-gray-50, to obscure central divider if needed */
+        }
+        #left-column {
+             border-right: 2px solid #d1d5db; /* gray-300, this is the top part of the vertical line */
+        }
+        .draggable-shapes-container {
+            flex-grow: 1;
+            position: relative; 
+            display: flex; 
+            padding: 20px;
+            overflow: hidden; /* Clips local confetti to this container */
+            z-index: 1; /* Above the main vertical divider */
+        }
+        #fullscreen-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            background-color: #3b82f6; /* blue-500 */
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            z-index: 2000; 
+        }
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0,0,0,0.7);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 10px;
+            font-size: 24px;
+            z-index: 3000;
+            display: none; 
+            text-align: center;
+        }
+        .confetti-particle { /* For local confetti */
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            opacity: 0.9;
+            pointer-events: none; 
+            z-index: 1500; 
+        }
+        .fullscreen-confetti-particle { /* For full screen confetti */
+            position: absolute;
+            width: 12px; /* Slightly larger */
+            height: 12px;
+            border-radius: 50%;
+            opacity: 0.9;
+            pointer-events: none;
+            z-index: 1900; /* Above local confetti, below button/message */
+        }
+        #central-divider-line {
+            position: absolute;
+            top: 0; /* Starts from the very top of game-container */
+            bottom: 0; /* Goes to the very bottom of game-container */
+            left: 50%;
+            width: 2px;
+            background-color: #d1d5db; /* gray-300 */
+            transform: translateX(-1px);
+            z-index: 0; /* Behind content panels */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 overflow-hidden">
+
+    <div id="game-container">
+        <div id="central-divider-line"></div>
+
+        <div class="top-panel">
+            <div id="left-column" class="column"> <div id="target-shape-left" class="target-shape"></div>
+            </div>
+            <div id="right-column" class="column">
+                <div id="target-shape-right" class="target-shape"></div>
+            </div>
+        </div>
+
+        <div id="draggable-shapes-container" class="draggable-shapes-container">
+            </div>
+
+        <button id="fullscreen-button">Fullscreen</button>
+        <audio id="yay-sound" src="yay.mp3" preload="auto"></audio>
+        <audio id="pop-sound" src="pop1.mp3" preload="auto"></audio> {/* Added pop sound element */}
+    </div>
+    <div id="message-box" class="message-box"></div>
+
+    <script>
+        const gameContainer = document.getElementById('game-container');
+        const targetShapeLeftDiv = document.getElementById('target-shape-left');
+        const targetShapeRightDiv = document.getElementById('target-shape-right');
+        const draggableShapesContainer = document.getElementById('draggable-shapes-container');
+        const fullscreenButton = document.getElementById('fullscreen-button');
+        const messageBox = document.getElementById('message-box');
+        const yaySound = document.getElementById('yay-sound');
+        const popSound = document.getElementById('pop-sound'); // Get reference to pop sound
+
+        const SHAPES = ['circle', 'square', 'triangle'];
+        const COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#f97316', '#8b5cf6'];
+        const CONFETTI_COLORS = ['#fde68a', '#fecaca', '#a5f3fc', '#bbf7d0', '#fbcfe8', '#c7d2fe'];
+
+        let currentTargetShapes = { left: null, right: null };
+        let shapesToMatch = 0;
+        let matchedShapes = 0;
+
+        let activeShape = null;
+        let offsetX, offsetY;
+
+        function getRandomElement(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+
+        function createShapeSvg(type, color, size = 80) {
+            const svgNS = "http://www.w3.org/2000/svg";
+            const svg = document.createElementNS(svgNS, "svg");
+            svg.setAttribute("viewBox", "0 0 100 100");
+            svg.setAttribute("width", size);
+            svg.setAttribute("height", size);
+            let element;
+            if (type === 'circle') {
+                element = document.createElementNS(svgNS, "circle");
+                element.setAttribute("cx", "50");
+                element.setAttribute("cy", "50");
+                element.setAttribute("r", "45");
+            } else if (type === 'square') {
+                element = document.createElementNS(svgNS, "rect");
+                element.setAttribute("x", "5");
+                element.setAttribute("y", "5");
+                element.setAttribute("width", "90");
+                element.setAttribute("height", "90");
+                element.setAttribute("rx", "5");
+            } else if (type === 'triangle') {
+                element = document.createElementNS(svgNS, "polygon");
+                element.setAttribute("points", "50,5 95,95 5,95");
+            }
+            element.setAttribute("fill", color);
+            svg.appendChild(element);
+            return svg;
+        }
+
+        function displayMessage(text, duration = 1500) {
+            messageBox.textContent = text;
+            messageBox.style.display = 'block';
+            setTimeout(() => {
+                messageBox.style.display = 'none';
+            }, duration);
+        }
+
+        // Confetti for individual shape match
+        function createLocalConfetti(x, y) {
+            const numParticles = 25 + Math.floor(Math.random() * 15); // 25-40 particles
+            for (let i = 0; i < numParticles; i++) {
+                const particle = document.createElement('div');
+                particle.classList.add('confetti-particle');
+                particle.style.backgroundColor = getRandomElement(CONFETTI_COLORS);
+                particle.style.left = `${x}px`;
+                particle.style.top = `${y}px`;
+                draggableShapesContainer.appendChild(particle); 
+
+                const angle = Math.random() * Math.PI * 2;
+                const velocity = 40 + Math.random() * 80;
+                const gravity = 0.7;
+                const friction = 0.97;
+                let vx = Math.cos(angle) * velocity / 12;
+                let vy = Math.sin(angle) * velocity / 12 - 2.5;
+                const life = 50 + Math.random() * 30;
+                let currentLife = 0;
+
+                function animateParticle() {
+                    if (currentLife >= life) {
+                        particle.remove();
+                        return;
+                    }
+                    vx *= friction;
+                    vy += gravity / 6;
+                    particle.style.transform = `translate(${vx * currentLife}px, ${vy * currentLife}px) scale(${1 - currentLife/life})`;
+                    particle.style.opacity = `${1 - currentLife/life}`;
+                    currentLife++;
+                    requestAnimationFrame(animateParticle);
+                }
+                requestAnimationFrame(animateParticle);
+            }
+        }
+
+        // Confetti for full screen on round completion
+        function createFullScreenConfetti() {
+            const numParticles = 100 + Math.floor(Math.random() * 50); 
+            const containerWidth = gameContainer.clientWidth;
+            const containerHeight = gameContainer.clientHeight;
+
+            for (let i = 0; i < numParticles; i++) {
+                const particle = document.createElement('div');
+                particle.classList.add('fullscreen-confetti-particle'); 
+                particle.style.backgroundColor = getRandomElement(CONFETTI_COLORS);
+                
+                particle.style.left = `${Math.random() * containerWidth}px`;
+                particle.style.top = `${(Math.random() * -containerHeight * 0.5) - 20}px`; 
+                
+                gameContainer.appendChild(particle); 
+
+                const fallSpeed = 1 + Math.random() * 2; 
+                const drift = (Math.random() - 0.5) * 2; 
+                const life = 100 + Math.random() * 80; 
+                let currentLife = 0;
+                let currentY = parseFloat(particle.style.top);
+                let currentX = parseFloat(particle.style.left);
+
+                function animateParticle() {
+                    if (currentLife >= life || currentY > containerHeight + 20) {
+                        particle.remove();
+                        return;
+                    }
+                    currentY += fallSpeed * (1 + currentLife / life * 0.5) ; 
+                    currentX += drift;
+                    
+                    particle.style.top = `${currentY}px`;
+                    particle.style.left = `${currentX}px`;
+                    particle.style.opacity = `${1 - (currentLife / life * 0.7)}`; 
+                    particle.style.transform = `scale(${1 - currentLife/life * 0.5})`;
+                    
+                    currentLife++;
+                    requestAnimationFrame(animateParticle);
+                }
+                requestAnimationFrame(animateParticle);
+            }
+        }
+
+
+        function startRound() {
+            console.log("Starting new round...");
+            draggableShapesContainer.innerHTML = ''; 
+            const oldFullscreenConfetti = gameContainer.querySelectorAll('.fullscreen-confetti-particle');
+            oldFullscreenConfetti.forEach(c => c.remove());
+
+            matchedShapes = 0;
+
+            currentTargetShapes.left = getRandomElement(SHAPES);
+            do {
+                currentTargetShapes.right = getRandomElement(SHAPES);
+            } while (currentTargetShapes.left === currentTargetShapes.right && SHAPES.length > 1);
+            
+            targetShapeLeftDiv.innerHTML = '';
+            targetShapeLeftDiv.appendChild(createShapeSvg(currentTargetShapes.left, '#6b7280', 100));
+
+            targetShapeRightDiv.innerHTML = '';
+            targetShapeRightDiv.appendChild(createShapeSvg(currentTargetShapes.right, '#6b7280', 100));
+
+            const numShapesToGenerate = Math.floor(Math.random() * 3) + 5; 
+            let tempShapes = [];
+
+            for (let i = 0; i < numShapesToGenerate; i++) {
+                const targetType = (Math.random() < 0.5) ? currentTargetShapes.left : currentTargetShapes.right;
+                if (i === 0 && !tempShapes.some(s => s.type === currentTargetShapes.left)) {
+                     tempShapes.push({ type: currentTargetShapes.left, color: getRandomElement(COLORS) });
+                } else if (i === 1 && !tempShapes.some(s => s.type === currentTargetShapes.right) && currentTargetShapes.left !== currentTargetShapes.right) {
+                     tempShapes.push({ type: currentTargetShapes.right, color: getRandomElement(COLORS) });
+                } else {
+                    tempShapes.push({ type: targetType, color: getRandomElement(COLORS) });
+                }
+            }
+            tempShapes.sort(() => Math.random() - 0.5);
+            shapesToMatch = tempShapes.length;
+
+            tempShapes.forEach((shapeData, index) => {
+                const shapeDiv = document.createElement('div');
+                shapeDiv.classList.add('shape');
+                shapeDiv.appendChild(createShapeSvg(shapeData.type, shapeData.color));
+                shapeDiv.dataset.shapeType = shapeData.type;
+                shapeDiv.id = `shape-${index}`;
+
+                const containerRect = draggableShapesContainer.getBoundingClientRect();
+                const shapeSize = 80; 
+                const padding = 10; 
+
+                const maxX = containerRect.width - shapeSize - padding;
+                const maxY = containerRect.height - shapeSize - padding;
+                
+                let xPos = padding + Math.random() * (maxX - padding);
+                let yPos = (containerRect.height / 2) + Math.random() * (containerRect.height / 2 - shapeSize - padding);
+                yPos = Math.max(padding, yPos); 
+
+                shapeDiv.style.left = `${Math.min(xPos, maxX)}px`;
+                shapeDiv.style.top = `${Math.min(yPos, maxY)}px`;
+                
+                draggableShapesContainer.appendChild(shapeDiv);
+
+                shapeDiv.addEventListener('touchstart', onDragStart, { passive: false });
+                shapeDiv.addEventListener('mousedown', onDragStart);
+            });
+
+             if (shapesToMatch === 0) {
+                setTimeout(startRound, 100);
+            }
+        }
+
+        function onDragStart(e) {
+            let targetShapeElement = null;
+            if (e.target.closest && e.target.closest('.shape')) {
+                targetShapeElement = e.target.closest('.shape');
+            } else if (e.target.classList.contains('shape')) {
+                targetShapeElement = e.target;
+            } else { return; }
+            
+            if (targetShapeElement.classList.contains('matched')) return;
+            activeShape = targetShapeElement;
+            activeShape.classList.add('dragging');
+            
+            const draggableContainerRect = draggableShapesContainer.getBoundingClientRect();
+            if (e.type === 'touchstart') {
+                const touch = e.touches[0];
+                offsetX = touch.clientX - activeShape.getBoundingClientRect().left;
+                offsetY = touch.clientY - activeShape.getBoundingClientRect().top;
+                e.preventDefault();
+            } else { 
+                offsetX = e.clientX - activeShape.getBoundingClientRect().left;
+                offsetY = e.clientY - activeShape.getBoundingClientRect().top;
+            }
+        }
+
+        function onDragMove(e) {
+            if (!activeShape) return;
+            let clientX, clientY;
+            if (e.type === 'touchmove') {
+                const touch = e.touches[0];
+                clientX = touch.clientX;
+                clientY = touch.clientY;
+                e.preventDefault(); 
+            } else { 
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            
+            const draggableContainerRect = draggableShapesContainer.getBoundingClientRect();
+            let newX = clientX - draggableContainerRect.left - offsetX;
+            let newY = clientY - draggableContainerRect.top - offsetY;
+            const shapeWidth = activeShape.offsetWidth;
+            const shapeHeight = activeShape.offsetHeight;
+            newX = Math.max(0, Math.min(newX, draggableContainerRect.width - shapeWidth));
+            newY = Math.max(0, Math.min(newY, draggableContainerRect.height - shapeHeight));
+            activeShape.style.left = `${newX}px`;
+            activeShape.style.top = `${newY}px`;
+        }
+
+        function onDragEnd(e) {
+            if (!activeShape) return;
+            activeShape.classList.remove('dragging');
+            const shapeType = activeShape.dataset.shapeType;
+            const shapeRect = activeShape.getBoundingClientRect();
+            const gameContainerRect = gameContainer.getBoundingClientRect();
+            const shapeCenterX = shapeRect.left + shapeRect.width / 2;
+            const dividerX = gameContainerRect.left + gameContainerRect.width / 2;
+            let droppedInColumn = (shapeCenterX < dividerX) ? 'left' : 'right';
+            
+            let correctMatch = (droppedInColumn === 'left' && shapeType === currentTargetShapes.left) ||
+                               (droppedInColumn === 'right' && shapeType === currentTargetShapes.right);
+
+            if (correctMatch) {
+                const containerRect = draggableShapesContainer.getBoundingClientRect();
+                const confettiX = shapeRect.left - containerRect.left + shapeRect.width / 2;
+                const confettiY = shapeRect.top - containerRect.top + shapeRect.height / 2;
+                createLocalConfetti(confettiX, confettiY);
+
+                // Play pop sound
+                if (popSound) {
+                    popSound.currentTime = 0; // Rewind
+                    popSound.play().catch(error => console.warn("Pop sound play failed. Ensure pop1.mp3 is present.", error));
+                }
+
+                activeShape.style.opacity = '0';
+                activeShape.style.transform = 'scale(0.3)'; 
+                activeShape.classList.add('matched'); 
+                activeShape.removeEventListener('touchstart', onDragStart);
+                activeShape.removeEventListener('mousedown', onDragStart);
+                const shapeToRemove = activeShape;
+                setTimeout(() => {
+                    if(shapeToRemove && shapeToRemove.parentNode) {
+                         shapeToRemove.parentNode.removeChild(shapeToRemove);
+                    }
+                }, 300);
+                
+                matchedShapes++;
+                if (matchedShapes === shapesToMatch) {
+                    displayMessage("Well Done!", 2500); 
+                    if (yaySound) {
+                        yaySound.currentTime = 0; 
+                        yaySound.play().catch(error => console.warn("Yay sound play failed. Ensure yay.mp3 is present.", error));
+                    }
+                    createFullScreenConfetti(); 
+                    setTimeout(startRound, 3000); 
+                }
+            } else {
+                // No "Try Again" message
+            }
+            activeShape = null;
+        }
+
+        fullscreenButton.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                if (gameContainer.requestFullscreen) {
+                    gameContainer.requestFullscreen().catch(err => {
+                        displayMessage(`Fullscreen not supported or denied.`, 2000);
+                    });
+                } else {
+                     displayMessage("Fullscreen API not supported.", 2000);
+                }
+            }
+        });
+
+        document.addEventListener('touchmove', onDragMove, { passive: false });
+        document.addEventListener('mousemove', onDragMove);
+        document.addEventListener('touchend', onDragEnd);
+        document.addEventListener('mouseup', onDragEnd);
+        
+        startRound();
+        
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                console.log("Window resized, restarting round for layout consistency.");
+                displayMessage("Resizing...", 500);
+                startRound(); 
+            }, 500); 
+        });
+    </script>
+</body>
+</html>
+
