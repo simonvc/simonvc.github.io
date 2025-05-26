@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Color Pop Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden; /* Prevent scrollbars */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+            font-family: 'Arial Rounded MT Bold', 'Helvetica Rounded', Arial, sans-serif;
+            touch-action: none; /* Prevent default touch behaviors like scrolling/zooming */
+        }
+        #gameCanvas {
+            border: 2px solid #333;
+            background-color: #fff;
+            cursor: pointer;
+        }
+        /* Message styling is less critical now as the word is drawn on canvas */
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- Game Configuration ---
+        const GAME_COLORS = ['red', 'green', 'yellow', 'blue', 'purple', 'orange', 'pink', 'brown']; // Added more colors
+        const BUBBLE_RADIUS_MIN = 35; // Finger-sized
+        const BUBBLE_RADIUS_MAX = 60; // Slightly larger max
+        const NUM_BUBBLES_MIN = 4;
+        const NUM_BUBBLES_MAX = 7;
+        const BUBBLE_SPEED_MAX = 0.8; // Slightly slower for toddlers
+        const BUBBLE_OPACITY = 0.75;
+        const PARTICLE_COUNT = 25;
+        const PARTICLE_SPEED = 2.5;
+        const PARTICLE_LIFE = 70; // frames
+        const CONFETTI_COUNT = 180;
+        const CONFETTI_LIFE = 150; // frames, longer celebration
+
+        // --- Game State ---
+        let currentColorIndex = 0;
+        let currentWord = '';
+        let bubbles = [];
+        let particles = [];
+        let confetti = [];
+        let wrongBalloons = [];
+        let level = 0;
+        let celebrationTimeout = null;
+        let isCelebrating = false;
+
+        // --- Utility Functions ---
+        function getRandom(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+
+        function setCanvasSize() {
+            const maxWidth = 800;
+            const maxHeight = 600;
+            let aspectRatio = window.innerWidth / window.innerHeight; // Use device aspect ratio more directly
+            if (aspectRatio > 1.8) aspectRatio = 1.8; // Cap wide aspect ratio
+            if (aspectRatio < 0.8) aspectRatio = 0.8; // Cap tall aspect ratio
+
+
+            let w = window.innerWidth * 0.95; // Use more of the screen
+            let h = window.innerHeight * 0.95;
+
+            // Try to fit while maintaining aspect ratio, favouring fitting device screen
+            if (w / h > aspectRatio) {
+                w = h * aspectRatio;
+            } else {
+                h = w / aspectRatio;
+            }
+            
+            canvas.width = Math.min(w, maxWidth);
+            canvas.height = Math.min(h, maxHeight);
+
+            // If it's still too big for the window after aspect ratio adjustment (unlikely with 0.95)
+            if (canvas.width > window.innerWidth * 0.95) {
+                const scale = (window.innerWidth * 0.95) / canvas.width;
+                canvas.width *= scale;
+                canvas.height *= scale;
+            }
+            if (canvas.height > window.innerHeight * 0.95) {
+                const scale = (window.innerHeight * 0.95) / canvas.height;
+                canvas.width *= scale;
+                canvas.height *= scale;
+            }
+
+        }
+
+        // --- Bubble Class ---
+        class Bubble {
+            constructor(x, y, radius, color, isWrong = false) {
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.color = color;
+                this.dx = getRandom(-BUBBLE_SPEED_MAX, BUBBLE_SPEED_MAX) || 0.05 * (Math.random() < 0.5 ? 1 : -1) ;
+                this.dy = getRandom(-BUBBLE_SPEED_MAX, BUBBLE_SPEED_MAX) || 0.05 * (Math.random() < 0.5 ? 1 : -1) ;
+                this.opacity = BUBBLE_OPACITY;
+                this.isPopped = false;
+                this.isWrong = isWrong;
+            }
+
+            draw() {
+                if (this.isPopped) return;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = this.opacity;
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+
+                ctx.beginPath();
+                ctx.arc(this.x - this.radius * 0.3, this.y - this.radius * 0.3, this.radius * 0.25, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.fill();
+            }
+
+            update() {
+                if (this.isPopped) return;
+
+                this.x += this.dx;
+                this.y += this.dy;
+
+                if (this.x + this.radius > canvas.width || this.x - this.radius < 0) {
+                    this.dx *= -1;
+                    this.x = Math.max(this.radius, Math.min(this.x, canvas.width - this.radius));
+                }
+                if (this.y + this.radius > canvas.height || this.y - this.radius < 0) {
+                    this.dy *= -1;
+                    this.y = Math.max(this.radius, Math.min(this.y, canvas.height - this.radius));
+                }
+            }
+
+            pop() {
+                if (this.isWrong) return false;
+                if (this.isPopped) return false; // Already popped
+
+                this.isPopped = true;
+                for (let i = 0; i < PARTICLE_COUNT; i++) {
+                    particles.push(new Particle(this.x, this.y, this.color, this.radius * 0.3)); // Particles relative to bubble size
+                }
+                return true;
+            }
+        }
+
+        // --- Particle Class ---
+        class Particle {
+            constructor(x, y, color, initialSize) {
+                this.x = x;
+                this.y = y;
+                this.radius = getRandom(initialSize * 0.2, initialSize * 0.5);
+                this.color = color;
+                this.dx = getRandom(-PARTICLE_SPEED, PARTICLE_SPEED);
+                this.dy = getRandom(-PARTICLE_SPEED, PARTICLE_SPEED);
+                this.life = PARTICLE_LIFE;
+                this.opacity = 1;
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = this.opacity;
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            }
+
+            update() {
+                this.x += this.dx;
+                this.y += this.dy;
+                this.dy += 0.03; // Softer gravity
+                this.life--;
+                this.opacity = Math.max(0, this.life / PARTICLE_LIFE);
+                if (this.radius > 0.2) this.radius -= 0.05; // Shrink
+            }
+        }
+
+        // --- Confetti Particle Class ---
+        class ConfettiParticle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height - canvas.height;
+                this.size = getRandom(8, 20); // Slightly larger confetti
+                this.color = `hsl(${Math.random() * 360}, 100%, 75%)`;
+                this.dx = getRandom(-2.5, 2.5);
+                this.dy = getRandom(1.5, 4.5);
+                this.life = CONFETTI_LIFE;
+                this.opacity = 1;
+                this.angle = Math.random() * Math.PI * 2;
+                this.spin = getRandom(-0.15, 0.15);
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = this.opacity;
+                // Draw various shapes for confetti
+                const shapeType = Math.floor(Math.random() * 3);
+                if (shapeType === 0) { // Rectangle
+                    ctx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size * 0.6);
+                } else if (shapeType === 1) { // Circle
+                    ctx.beginPath();
+                    ctx.arc(0,0, this.size/2, 0, Math.PI*2);
+                    ctx.fill();
+                } else { // Triangle
+                    ctx.beginPath();
+                    ctx.moveTo(0, -this.size / 2);
+                    ctx.lineTo(this.size / 2, this.size / 2);
+                    ctx.lineTo(-this.size / 2, this.size / 2);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                ctx.restore();
+                ctx.globalAlpha = 1.0;
+            }
+
+            update() {
+                this.x += this.dx;
+                this.y += this.dy;
+                this.angle += this.spin;
+                this.life--;
+                this.opacity = Math.max(0, this.life / CONFETTI_LIFE);
+                if (this.dy < 6) this.dy += 0.06;
+                if (this.dx > 0) this.dx -= 0.015; else if (this.dx < 0) this.dx += 0.015;
+
+                // Keep confetti on screen longer by bouncing off bottom if still active
+                if (this.y > canvas.height + this.size && this.dy > 0 && this.life > CONFETTI_LIFE * 0.2) {
+                    this.y = canvas.height + this.size;
+                    this.dy *= -0.6; // Bounce with some energy loss
+                }
+                 // Wrap around sides
+                if (this.x < -this.size) this.x = canvas.width + this.size;
+                if (this.x > canvas.width + this.size) this.x = -this.size;
+            }
+        }
+
+        // --- Game Logic ---
+        function startNextLevel() {
+            level++;
+            currentWord = GAME_COLORS[currentColorIndex];
+            bubbles = [];
+            wrongBalloons = [];
+            particles = [];
+            confetti = [];
+            isCelebrating = false;
+            clearTimeout(celebrationTimeout);
+
+            const numBubbles = Math.floor(getRandom(NUM_BUBBLES_MIN, NUM_BUBBLES_MAX + 1));
+            for (let i = 0; i < numBubbles; i++) {
+                let radius, x, y, validPosition;
+                do {
+                    validPosition = true;
+                    radius = getRandom(BUBBLE_RADIUS_MIN, BUBBLE_RADIUS_MAX);
+                    x = getRandom(radius, canvas.width - radius);
+                    y = getRandom(radius, canvas.height - radius);
+                    // Check for overlap with existing bubbles (simple check)
+                    for(const b of bubbles) {
+                        const dist = Math.sqrt((x-b.x)**2 + (y-b.y)**2);
+                        if(dist < radius + b.radius + 10) { // +10 for spacing
+                            validPosition = false;
+                            break;
+                        }
+                    }
+                } while(!validPosition);
+                bubbles.push(new Bubble(x, y, radius, currentWord));
+            }
+
+            if (level > 2) { // Start wrong balloons from the 3rd word (level 3)
+                const numWrongBalloons = Math.floor(getRandom(1, level > 4 ? 3 : 2)); // More wrong ones later
+                for (let i = 0; i < numWrongBalloons; i++) {
+                    let wrongColor = currentWord;
+                    while (wrongColor === currentWord) {
+                        wrongColor = GAME_COLORS[Math.floor(Math.random() * GAME_COLORS.length)];
+                    }
+                     let radius, x, y, validPosition;
+                    do {
+                        validPosition = true;
+                        radius = getRandom(BUBBLE_RADIUS_MIN, BUBBLE_RADIUS_MAX);
+                        x = getRandom(radius, canvas.width - radius);
+                        y = getRandom(radius, canvas.height - radius);
+                        for(const b of [...bubbles, ...wrongBalloons]) {
+                            const dist = Math.sqrt((x-b.x)**2 + (y-b.y)**2);
+                            if(dist < radius + b.radius + 10) {
+                                validPosition = false;
+                                break;
+                            }
+                        }
+                    } while(!validPosition);
+                    wrongBalloons.push(new Bubble(x, y, radius, wrongColor, true));
+                }
+            }
+
+            currentColorIndex = (currentColorIndex + 1) % GAME_COLORS.length;
+            if (currentColorIndex === 0 && level > GAME_COLORS.length) { // Shuffle colors after one full cycle if many levels
+                shuffleArray(GAME_COLORS);
+            }
+        }
+        
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+
+        function drawWord() {
+            ctx.fillStyle = currentWord; // Use the actual color for the word
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 3;
+            const fontSize = Math.min(canvas.width / currentWord.length * 0.8, canvas.height * 0.15); // Dynamic font size
+            ctx.font = `bold ${fontSize}px 'Arial Rounded MT Bold', 'Helvetica Rounded', Arial, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            // Draw stroke first
+            ctx.strokeText(currentWord.toUpperCase(), canvas.width / 2, canvas.height / 2);
+            // Then fill
+            ctx.fillText(currentWord.toUpperCase(), canvas.width / 2, canvas.height / 2);
+        }
+
+        function handleInteraction(event) {
+            if (isCelebrating) return;
+
+            const rect = canvas.getBoundingClientRect();
+            let clientX, clientY;
+
+            if (event.type.startsWith('mouse')) { // mousedown, mousemove (if dragging)
+                clientX = event.clientX;
+                clientY = event.clientY;
+            } else if (event.type.startsWith('touch')) { // touchstart, touchmove
+                if (event.touches.length === 0) return;
+                clientX = event.touches[0].clientX;
+                clientY = event.touches[0].clientY;
+                event.preventDefault();
+            } else {
+                return;
+            }
+
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+
+            // Check correct bubbles first
+            for (let i = bubbles.length - 1; i >= 0; i--) {
+                const bubble = bubbles[i];
+                if (bubble.isPopped) continue;
+                const distance = Math.sqrt((x - bubble.x) ** 2 + (y - bubble.y) ** 2);
+                if (distance < bubble.radius) {
+                    if (bubble.pop()) {
+                        // Optional: play a pop sound
+                        return; // Pop only one
+                    }
+                }
+            }
+            // Check wrong balloons (they don't pop but could have a "boing" effect)
+            for (let i = wrongBalloons.length - 1; i >= 0; i--) {
+                const balloon = wrongBalloons[i];
+                const distance = Math.sqrt((x - balloon.x) ** 2 + (y - balloon.y) ** 2);
+                if (distance < balloon.radius) {
+                    // Add a small "wiggle" or "boing" effect if desired
+                    // For now, they just don't pop
+                    // Optional: play a "thud" sound
+                    return;
+                }
+            }
+        }
+
+
+        function update() {
+            if (isCelebrating) {
+                confetti.forEach(c => c.update());
+                confetti = confetti.filter(c => c.life > 0 || c.y < canvas.height + c.size * 2); // Keep if visible
+                if (confetti.length === 0 && celebrationTimeout === null) { // Ensure timeout only set once
+                    // This logic is moved to the check for level completion
+                }
+                return;
+            }
+
+            [...bubbles, ...wrongBalloons].forEach(b => b.update());
+            particles.forEach(p => p.update());
+            particles = particles.filter(p => p.life > 0 && p.radius > 0);
+
+            const activeBubbles = bubbles.filter(b => !b.isPopped);
+            if (activeBubbles.length === 0 && bubbles.length > 0 && !isCelebrating) {
+                isCelebrating = true;
+                for (let i = 0; i < CONFETTI_COUNT; i++) {
+                    confetti.push(new ConfettiParticle());
+                }
+                // Celebration lasts until confetti is mostly gone + a buffer
+                const celebrationDuration = (CONFETTI_LIFE * (1000 / 60)) * 1.2 + 500;
+                celebrationTimeout = setTimeout(() => {
+                    celebrationTimeout = null; // Clear timeout ID
+                    if (isCelebrating) { // Double check it wasn't cancelled
+                       startNextLevel();
+                    }
+                }, celebrationDuration);
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (isCelebrating) {
+                // Draw "YAY!" behind confetti
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.font = `bold ${canvas.height * 0.2}px 'Arial Rounded MT Bold'`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText("YAY!", canvas.width / 2, canvas.height / 2);
+                confetti.forEach(c => c.draw());
+            } else {
+                drawWord();
+                wrongBalloons.forEach(b => b.draw());
+                bubbles.forEach(b => b.draw());
+                particles.forEach(p => p.draw());
+            }
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function init() {
+            setCanvasSize();
+            shuffleArray(GAME_COLORS); // Shuffle colors at the start
+            window.addEventListener('resize', () => {
+                setCanvasSize();
+                // Could redraw current state if necessary, but for simplicity,
+                // elements might jump slightly.
+                // If game is active and not celebrating, just redraw.
+                if(!isCelebrating) draw(); else {
+                    // if celebrating, need to re-init confetti positions if canvas size changes a lot
+                    // for now, let's keep it simple.
+                }
+            });
+
+            canvas.addEventListener('mousedown', handleInteraction);
+            canvas.addEventListener('touchstart', handleInteraction, { passive: false });
+
+            startNextLevel();
+            gameLoop();
+        }
+
+        init();
+    </script>
+</body>
+</html>
