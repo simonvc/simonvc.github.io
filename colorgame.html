@@ -9,6 +9,7 @@
             margin: 0;
             overflow: hidden; /* Prevent scrollbars */
             display: flex;
+            flex-direction: column; /* To stack button and canvas */
             justify-content: center;
             align-items: center;
             height: 100vh;
@@ -16,34 +17,74 @@
             font-family: 'Arial Rounded MT Bold', 'Helvetica Rounded', Arial, sans-serif;
             touch-action: none; /* Prevent default touch behaviors like scrolling/zooming */
         }
+        #gameContainer {
+            position: relative; /* For positioning button over canvas if needed */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
         #gameCanvas {
             border: 2px solid #333;
             background-color: #fff;
             cursor: pointer;
+            /* Max width/height will be controlled by JS now for better fullscreen transition */
         }
-        /* Message styling is less critical now as the word is drawn on canvas */
+        #fullscreenButton {
+            position: fixed; /* Fixed position relative to viewport */
+            bottom: 10px;
+            right: 10px;
+            padding: 10px 15px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 1000; /* Ensure it's on top */
+        }
+        #fullscreenButton:hover {
+            background-color: #45a049;
+        }
+
+        /* Styles when in fullscreen to hide scrollbars and ensure body fills screen */
+        :fullscreen, :webkitIsFullScreen, :mozFullScreen {
+            overflow: hidden !important; /* Important to override any body overflow */
+        }
+        body:fullscreen, body:-webkit-full-screen, body:-moz-full-screen {
+            width: 100%;
+            height: 100%;
+            /* Ensure no margins or padding interfere */
+            margin: 0;
+            padding: 0;
+        }
+
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas"></canvas>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+    <button id="fullscreenButton">Fullscreen</button>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        const fullscreenButton = document.getElementById('fullscreenButton');
+        const gameContainer = document.getElementById('gameContainer'); // Will be our fullscreen target
 
         // --- Game Configuration ---
-        const GAME_COLORS = ['red', 'green', 'yellow', 'blue', 'purple', 'orange', 'pink', 'brown']; // Added more colors
-        const BUBBLE_RADIUS_MIN = 35; // Finger-sized
-        const BUBBLE_RADIUS_MAX = 60; // Slightly larger max
+        const GAME_COLORS = ['red', 'green', 'yellow', 'blue', 'purple', 'orange', 'pink', 'brown'];
+        const BUBBLE_RADIUS_MIN = 35;
+        const BUBBLE_RADIUS_MAX = 60;
         const NUM_BUBBLES_MIN = 4;
         const NUM_BUBBLES_MAX = 7;
-        const BUBBLE_SPEED_MAX = 0.8; // Slightly slower for toddlers
+        const BUBBLE_SPEED_MAX = 0.8;
         const BUBBLE_OPACITY = 0.75;
         const PARTICLE_COUNT = 25;
         const PARTICLE_SPEED = 2.5;
-        const PARTICLE_LIFE = 70; // frames
+        const PARTICLE_LIFE = 70;
         const CONFETTI_COUNT = 180;
-        const CONFETTI_LIFE = 150; // frames, longer celebration
+        const CONFETTI_LIFE = 150;
 
         // --- Game State ---
         let currentColorIndex = 0;
@@ -62,39 +103,100 @@
         }
 
         function setCanvasSize() {
-            const maxWidth = 800;
-            const maxHeight = 600;
-            let aspectRatio = window.innerWidth / window.innerHeight; // Use device aspect ratio more directly
-            if (aspectRatio > 1.8) aspectRatio = 1.8; // Cap wide aspect ratio
-            if (aspectRatio < 0.8) aspectRatio = 0.8; // Cap tall aspect ratio
+            const isFullScreen = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+            let parentWidth, parentHeight;
 
+            if (isFullScreen) {
+                parentWidth = window.innerWidth; // Use full screen dimensions
+                parentHeight = window.innerHeight;
+            } else {
+                parentWidth = window.innerWidth * 0.95; // Use viewport dimensions with some padding
+                parentHeight = window.innerHeight * 0.95;
+            }
 
-            let w = window.innerWidth * 0.95; // Use more of the screen
-            let h = window.innerHeight * 0.95;
+            const maxWidth = 1000; // Max dimensions for non-fullscreen
+            const maxHeight = 750;
+            let aspectRatio = 4/3; // Desired aspect ratio
 
-            // Try to fit while maintaining aspect ratio, favouring fitting device screen
+            let w = parentWidth;
+            let h = parentHeight;
+
             if (w / h > aspectRatio) {
                 w = h * aspectRatio;
             } else {
                 h = w / aspectRatio;
             }
+
+            if (!isFullScreen) {
+                canvas.width = Math.min(w, maxWidth);
+                canvas.height = Math.min(h, maxHeight);
+            } else {
+                canvas.width = w; // Use full available space in fullscreen
+                canvas.height = h;
+            }
             
-            canvas.width = Math.min(w, maxWidth);
-            canvas.height = Math.min(h, maxHeight);
-
-            // If it's still too big for the window after aspect ratio adjustment (unlikely with 0.95)
-            if (canvas.width > window.innerWidth * 0.95) {
-                const scale = (window.innerWidth * 0.95) / canvas.width;
-                canvas.width *= scale;
-                canvas.height *= scale;
-            }
-            if (canvas.height > window.innerHeight * 0.95) {
-                const scale = (window.innerHeight * 0.95) / canvas.height;
-                canvas.width *= scale;
-                canvas.height *= scale;
+            // Center the gameContainer if canvas is smaller than window (non-fullscreen)
+            if (!isFullScreen) {
+                gameContainer.style.width = `${canvas.width}px`;
+                gameContainer.style.height = `${canvas.height}px`;
+            } else {
+                gameContainer.style.width = `100%`;
+                gameContainer.style.height = `100%`;
             }
 
+
+            // Redraw if game is active
+            if (!isCelebrating && currentWord) {
+                 draw(); // Redraw the current state
+            } else if (isCelebrating) {
+                draw(); // Also redraw during celebration
+            }
         }
+
+        // --- Fullscreen API Handling ---
+        function toggleFullScreen() {
+            const elem = document.documentElement; // Make the whole page fullscreen
+
+            if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
+                if (elem.requestFullscreen) {
+                    elem.requestFullscreen().catch(err => {
+                        // alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                        console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                    });
+                } else if (elem.mozRequestFullScreen) { /* Firefox */
+                    elem.mozRequestFullScreen();
+                } else if (elem.webkitRequestFullscreen) { /* Chrome, Safari & Opera */
+                    elem.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
+                } else if (elem.msRequestFullscreen) { /* IE/Edge */
+                    elem.msRequestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.mozCancelFullScreen) { /* Firefox */
+                    document.mozCancelFullScreen();
+                } else if (document.webkitExitFullscreen) { /* Chrome, Safari and Opera */
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) { /* IE/Edge */
+                    document.msExitFullscreen();
+                }
+            }
+        }
+
+        function updateFullscreenButton() {
+            if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement) {
+                fullscreenButton.textContent = 'Exit Fullscreen';
+            } else {
+                fullscreenButton.textContent = 'Fullscreen';
+            }
+        }
+
+        fullscreenButton.addEventListener('click', toggleFullScreen);
+        document.addEventListener('fullscreenchange', updateFullscreenButton);
+        document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+        document.addEventListener('mozfullscreenchange', updateFullscreenButton);
+        document.addEventListener('MSFullscreenChange', updateFullscreenButton);
+
 
         // --- Bubble Class ---
         class Bubble {
@@ -143,11 +245,11 @@
 
             pop() {
                 if (this.isWrong) return false;
-                if (this.isPopped) return false; // Already popped
+                if (this.isPopped) return false;
 
                 this.isPopped = true;
                 for (let i = 0; i < PARTICLE_COUNT; i++) {
-                    particles.push(new Particle(this.x, this.y, this.color, this.radius * 0.3)); // Particles relative to bubble size
+                    particles.push(new Particle(this.x, this.y, this.color, this.radius * 0.3));
                 }
                 return true;
             }
@@ -178,10 +280,10 @@
             update() {
                 this.x += this.dx;
                 this.y += this.dy;
-                this.dy += 0.03; // Softer gravity
+                this.dy += 0.03;
                 this.life--;
                 this.opacity = Math.max(0, this.life / PARTICLE_LIFE);
-                if (this.radius > 0.2) this.radius -= 0.05; // Shrink
+                if (this.radius > 0.2) this.radius -= 0.05;
             }
         }
 
@@ -190,7 +292,7 @@
             constructor() {
                 this.x = Math.random() * canvas.width;
                 this.y = Math.random() * canvas.height - canvas.height;
-                this.size = getRandom(8, 20); // Slightly larger confetti
+                this.size = getRandom(8, 20);
                 this.color = `hsl(${Math.random() * 360}, 100%, 75%)`;
                 this.dx = getRandom(-2.5, 2.5);
                 this.dy = getRandom(1.5, 4.5);
@@ -206,15 +308,14 @@
                 ctx.rotate(this.angle);
                 ctx.fillStyle = this.color;
                 ctx.globalAlpha = this.opacity;
-                // Draw various shapes for confetti
                 const shapeType = Math.floor(Math.random() * 3);
-                if (shapeType === 0) { // Rectangle
+                if (shapeType === 0) {
                     ctx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size * 0.6);
-                } else if (shapeType === 1) { // Circle
+                } else if (shapeType === 1) {
                     ctx.beginPath();
                     ctx.arc(0,0, this.size/2, 0, Math.PI*2);
                     ctx.fill();
-                } else { // Triangle
+                } else {
                     ctx.beginPath();
                     ctx.moveTo(0, -this.size / 2);
                     ctx.lineTo(this.size / 2, this.size / 2);
@@ -235,12 +336,10 @@
                 if (this.dy < 6) this.dy += 0.06;
                 if (this.dx > 0) this.dx -= 0.015; else if (this.dx < 0) this.dx += 0.015;
 
-                // Keep confetti on screen longer by bouncing off bottom if still active
                 if (this.y > canvas.height + this.size && this.dy > 0 && this.life > CONFETTI_LIFE * 0.2) {
                     this.y = canvas.height + this.size;
-                    this.dy *= -0.6; // Bounce with some energy loss
+                    this.dy *= -0.6;
                 }
-                 // Wrap around sides
                 if (this.x < -this.size) this.x = canvas.width + this.size;
                 if (this.x > canvas.width + this.size) this.x = -this.size;
             }
@@ -256,38 +355,46 @@
             confetti = [];
             isCelebrating = false;
             clearTimeout(celebrationTimeout);
+            // Make sure canvas is sized correctly for the new level
+            setCanvasSize(); // Call this to ensure canvas is ready before drawing bubbles
 
             const numBubbles = Math.floor(getRandom(NUM_BUBBLES_MIN, NUM_BUBBLES_MAX + 1));
             for (let i = 0; i < numBubbles; i++) {
                 let radius, x, y, validPosition;
+                let attempts = 0; // Prevent infinite loop
                 do {
                     validPosition = true;
-                    radius = getRandom(BUBBLE_RADIUS_MIN, BUBBLE_RADIUS_MAX);
+                    radius = getRandom(BUBBLE_RADIUS_MIN * (canvas.width/800), BUBBLE_RADIUS_MAX * (canvas.width/800)); // Scale radius
+                    radius = Math.max(20, radius); // Minimum radius
                     x = getRandom(radius, canvas.width - radius);
                     y = getRandom(radius, canvas.height - radius);
-                    // Check for overlap with existing bubbles (simple check)
                     for(const b of bubbles) {
                         const dist = Math.sqrt((x-b.x)**2 + (y-b.y)**2);
-                        if(dist < radius + b.radius + 10) { // +10 for spacing
+                        if(dist < radius + b.radius + 10) {
                             validPosition = false;
                             break;
                         }
                     }
-                } while(!validPosition);
-                bubbles.push(new Bubble(x, y, radius, currentWord));
+                    attempts++;
+                } while(!validPosition && attempts < 50); // Try 50 times
+                if (validPosition) { // Only push if a valid position was found
+                    bubbles.push(new Bubble(x, y, radius, currentWord));
+                }
             }
 
-            if (level > 2) { // Start wrong balloons from the 3rd word (level 3)
-                const numWrongBalloons = Math.floor(getRandom(1, level > 4 ? 3 : 2)); // More wrong ones later
+            if (level > 2) {
+                const numWrongBalloons = Math.floor(getRandom(1, level > 4 ? 3 : 2));
                 for (let i = 0; i < numWrongBalloons; i++) {
                     let wrongColor = currentWord;
                     while (wrongColor === currentWord) {
                         wrongColor = GAME_COLORS[Math.floor(Math.random() * GAME_COLORS.length)];
                     }
                      let radius, x, y, validPosition;
+                     let attempts = 0;
                     do {
                         validPosition = true;
-                        radius = getRandom(BUBBLE_RADIUS_MIN, BUBBLE_RADIUS_MAX);
+                        radius = getRandom(BUBBLE_RADIUS_MIN * (canvas.width/800), BUBBLE_RADIUS_MAX * (canvas.width/800));
+                        radius = Math.max(20, radius);
                         x = getRandom(radius, canvas.width - radius);
                         y = getRandom(radius, canvas.height - radius);
                         for(const b of [...bubbles, ...wrongBalloons]) {
@@ -297,13 +404,16 @@
                                 break;
                             }
                         }
-                    } while(!validPosition);
-                    wrongBalloons.push(new Bubble(x, y, radius, wrongColor, true));
+                        attempts++;
+                    } while(!validPosition && attempts < 50);
+                    if(validPosition) {
+                        wrongBalloons.push(new Bubble(x, y, radius, wrongColor, true));
+                    }
                 }
             }
 
             currentColorIndex = (currentColorIndex + 1) % GAME_COLORS.length;
-            if (currentColorIndex === 0 && level > GAME_COLORS.length) { // Shuffle colors after one full cycle if many levels
+            if (currentColorIndex === 0 && level > GAME_COLORS.length) {
                 shuffleArray(GAME_COLORS);
             }
         }
@@ -317,17 +427,16 @@
 
 
         function drawWord() {
-            ctx.fillStyle = currentWord; // Use the actual color for the word
+            ctx.fillStyle = currentWord;
             ctx.strokeStyle = 'black';
-            ctx.lineWidth = 3;
-            const fontSize = Math.min(canvas.width / currentWord.length * 0.8, canvas.height * 0.15); // Dynamic font size
+            ctx.lineWidth = Math.max(2, canvas.width * 0.005); // Scale line width
+            const baseFontSize = Math.min(canvas.width / (currentWord.length * 0.8 + 2), canvas.height * 0.15);
+            const fontSize = Math.max(24, baseFontSize); // Minimum font size
             ctx.font = `bold ${fontSize}px 'Arial Rounded MT Bold', 'Helvetica Rounded', Arial, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
 
-            // Draw stroke first
             ctx.strokeText(currentWord.toUpperCase(), canvas.width / 2, canvas.height / 2);
-            // Then fill
             ctx.fillText(currentWord.toUpperCase(), canvas.width / 2, canvas.height / 2);
         }
 
@@ -337,10 +446,10 @@
             const rect = canvas.getBoundingClientRect();
             let clientX, clientY;
 
-            if (event.type.startsWith('mouse')) { // mousedown, mousemove (if dragging)
+            if (event.type.startsWith('mouse')) {
                 clientX = event.clientX;
                 clientY = event.clientY;
-            } else if (event.type.startsWith('touch')) { // touchstart, touchmove
+            } else if (event.type.startsWith('touch')) {
                 if (event.touches.length === 0) return;
                 clientX = event.touches[0].clientX;
                 clientY = event.touches[0].clientY;
@@ -349,29 +458,24 @@
                 return;
             }
 
-            const x = clientX - rect.left;
-            const y = clientY - rect.top;
+            const x = (clientX - rect.left) * (canvas.width / rect.width); // Scale click to canvas internal resolution
+            const y = (clientY - rect.top) * (canvas.height / rect.height);
 
-            // Check correct bubbles first
+
             for (let i = bubbles.length - 1; i >= 0; i--) {
                 const bubble = bubbles[i];
                 if (bubble.isPopped) continue;
                 const distance = Math.sqrt((x - bubble.x) ** 2 + (y - bubble.y) ** 2);
                 if (distance < bubble.radius) {
                     if (bubble.pop()) {
-                        // Optional: play a pop sound
-                        return; // Pop only one
+                        return;
                     }
                 }
             }
-            // Check wrong balloons (they don't pop but could have a "boing" effect)
             for (let i = wrongBalloons.length - 1; i >= 0; i--) {
                 const balloon = wrongBalloons[i];
                 const distance = Math.sqrt((x - balloon.x) ** 2 + (y - balloon.y) ** 2);
                 if (distance < balloon.radius) {
-                    // Add a small "wiggle" or "boing" effect if desired
-                    // For now, they just don't pop
-                    // Optional: play a "thud" sound
                     return;
                 }
             }
@@ -381,10 +485,7 @@
         function update() {
             if (isCelebrating) {
                 confetti.forEach(c => c.update());
-                confetti = confetti.filter(c => c.life > 0 || c.y < canvas.height + c.size * 2); // Keep if visible
-                if (confetti.length === 0 && celebrationTimeout === null) { // Ensure timeout only set once
-                    // This logic is moved to the check for level completion
-                }
+                confetti = confetti.filter(c => c.life > 0 || c.y < canvas.height + c.size * 2);
                 return;
             }
 
@@ -398,11 +499,10 @@
                 for (let i = 0; i < CONFETTI_COUNT; i++) {
                     confetti.push(new ConfettiParticle());
                 }
-                // Celebration lasts until confetti is mostly gone + a buffer
                 const celebrationDuration = (CONFETTI_LIFE * (1000 / 60)) * 1.2 + 500;
                 celebrationTimeout = setTimeout(() => {
-                    celebrationTimeout = null; // Clear timeout ID
-                    if (isCelebrating) { // Double check it wasn't cancelled
+                    celebrationTimeout = null;
+                    if (isCelebrating) {
                        startNextLevel();
                     }
                 }, celebrationDuration);
@@ -413,15 +513,17 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             if (isCelebrating) {
-                // Draw "YAY!" behind confetti
+                const fontSize = Math.max(30, canvas.height * 0.2);
                 ctx.fillStyle = 'rgba(0,0,0,0.6)';
-                ctx.font = `bold ${canvas.height * 0.2}px 'Arial Rounded MT Bold'`;
+                ctx.font = `bold ${fontSize}px 'Arial Rounded MT Bold'`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText("YAY!", canvas.width / 2, canvas.height / 2);
                 confetti.forEach(c => c.draw());
             } else {
-                drawWord();
+                if (currentWord) { // Only draw word if it's set
+                   drawWord();
+                }
                 wrongBalloons.forEach(b => b.draw());
                 bubbles.forEach(b => b.draw());
                 particles.forEach(p => p.draw());
@@ -435,17 +537,11 @@
         }
 
         function init() {
-            setCanvasSize();
-            shuffleArray(GAME_COLORS); // Shuffle colors at the start
+            setCanvasSize(); // Initial sizing
+            shuffleArray(GAME_COLORS);
+            
             window.addEventListener('resize', () => {
-                setCanvasSize();
-                // Could redraw current state if necessary, but for simplicity,
-                // elements might jump slightly.
-                // If game is active and not celebrating, just redraw.
-                if(!isCelebrating) draw(); else {
-                    // if celebrating, need to re-init confetti positions if canvas size changes a lot
-                    // for now, let's keep it simple.
-                }
+                setCanvasSize(); // This will be called on fullscreen change too
             });
 
             canvas.addEventListener('mousedown', handleInteraction);
