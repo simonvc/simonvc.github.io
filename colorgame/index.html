@@ -5,11 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Color Pop Game</title>
 
-    <!-- PWA Manifest and Theme Color -->
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#FF9800"> <!-- Corresponds to manifest theme_color -->
-
-    <style>
+    <meta name="theme-color" content="#FF9800"> <style>
         body {
             margin: 0;
             overflow: hidden; /* Prevent scrollbars */
@@ -104,23 +101,28 @@
                 audioElement.currentTime = 0;
                 audioElement.play().catch(error => console.warn(`Audio play failed for ${audioElement.src}:`, error));
             } else if (audioElement && !audioUnlocked) {
-                console.log("Audio queued, waiting for user interaction to unlock.");
+                console.log(`Audio for ${audioElement.src} queued, waiting for user interaction to unlock.`);
             }
         }
 
         function unlockAudio() {
             if (!audioUnlocked) {
                 audioUnlocked = true;
-                const testSound = popSounds[0] || failSound || yaySound;
+                // Play a tiny silent sound to unlock audio context
+                const testSound = new Audio(); // Create a new dummy audio for unlocking
                 if (testSound) {
-                    const originalVolume = testSound.volume;
-                    testSound.volume = 0;
+                    testSound.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="; // Short silent WAV
+                    testSound.volume = 0.01; // Barely audible, effectively silent
                     testSound.play().then(() => {
-                        testSound.pause();
-                        testSound.currentTime = 0;
-                        testSound.volume = originalVolume;
-                        console.log("Audio context unlocked.");
-                    }).catch(e => console.warn("Audio unlock attempt failed silently:", e));
+                        console.log("Audio context unlocked by user interaction.");
+                        // Optionally play one of the real sounds very quietly if needed for further unlocking on all browsers
+                        // For example, if popSounds[0] exists:
+                        // const popSound = popSounds[0];
+                        // const originalVolume = popSound.volume;
+                        // popSound.volume = 0;
+                        // popSound.play().then(() => { popSound.pause(); popSound.currentTime = 0; popSound.volume = originalVolume; });
+
+                    }).catch(e => console.warn("Audio unlock attempt failed silently or was interrupted:", e));
                 }
             }
         }
@@ -135,7 +137,7 @@
 
         // --- Fullscreen API Handling ---
         function requestUserFullScreen() {
-            unlockAudio();
+            unlockAudio(); // Ensure audio is unlocked when user interacts for fullscreen
             const elem = document.documentElement;
             if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
                 if (elem.requestFullscreen) {
@@ -203,8 +205,56 @@
                 if (this.isWrong) return false;
                 if (this.isPopped) return false;
                 this.isPopped = true;
-                const randomPopSound = popSounds[Math.floor(Math.random() * popSounds.length)];
-                playAudio(randomPopSound);
+
+                const randomPopAudioElement = popSounds[Math.floor(Math.random() * popSounds.length)];
+                // Ensure color name is lowercase for filename consistency e.g. "red.mp3"
+                const colorAudioElement = new Audio(this.color.toLowerCase() + '.mp3');
+
+                if (audioUnlocked) {
+                    // 1. Play random pop sound
+                    // Clone the pop sound element or use its src to avoid issues if the same sound is rapidly played
+                    const popSoundToPlay = new Audio(randomPopAudioElement.src);
+
+                    popSoundToPlay.pause();
+                    popSoundToPlay.currentTime = 0;
+                    const popPromise = popSoundToPlay.play();
+
+                    if (popPromise !== undefined) {
+                        popPromise.then(() => {
+                            // Pop sound started, now listen for its end
+                            const onPopEnded = () => {
+                                popSoundToPlay.removeEventListener('ended', onPopEnded);
+                                popSoundToPlay.removeEventListener('error', onPopError); // Clean up error listener
+                                // 2. Play color sound
+                                playAudio(colorAudioElement); // Use existing playAudio helper
+                            };
+                            const onPopError = (err) => {
+                                console.warn(`Pop sound ${popSoundToPlay.src} errored:`, err);
+                                popSoundToPlay.removeEventListener('ended', onPopEnded);
+                                popSoundToPlay.removeEventListener('error', onPopError);
+                                // Fallback: Try to play the color sound directly if pop sound errors
+                                playAudio(colorAudioElement);
+                            };
+                            popSoundToPlay.addEventListener('ended', onPopEnded);
+                            popSoundToPlay.addEventListener('error', onPopError);
+                        }).catch(error => {
+                            console.warn(`Pop sound ${popSoundToPlay.src} failed to play:`, error);
+                            // Fallback: Try to play the color sound directly if pop sound fails to start
+                            playAudio(colorAudioElement);
+                        });
+                    } else {
+                        // Fallback for browsers where .play() doesn't return a promise
+                        console.warn("Audio .play() did not return a promise. Precise sequencing might be affected.");
+                        playAudio(popSoundToPlay); // Attempt to play pop sound
+                        setTimeout(() => { // Play color sound after a delay
+                            playAudio(colorAudioElement);
+                        }, 250); // Adjust delay based on typical pop sound length
+                    }
+                } else {
+                    // If audio isn't unlocked, playAudio will just log. The sequence won't happen.
+                    console.log("Audio not unlocked. Pop and color sounds cannot be played sequentially yet.");
+                }
+
                 for (let i = 0; i < PARTICLE_COUNT; i++) {
                     particles.push(new Particle(this.x, this.y, this.color, this.radius * 0.3));
                 }
@@ -309,6 +359,12 @@
             clearTimeout(celebrationTimeout);
             setCanvasSize();
 
+            // Play the MP3 for the current level's color
+            if (currentWord) {
+                const levelColorAudio = new Audio(currentWord.toLowerCase() + '.mp3');
+                playAudio(levelColorAudio);
+            }
+
             const scaleFactor = Math.min(canvas.width, canvas.height) / 600;
 
             const numBubbles = Math.floor(getRandom(NUM_BUBBLES_MIN, NUM_BUBBLES_MAX + 1));
@@ -366,7 +422,8 @@
         }
 
         function drawWord() {
-            ctx.fillStyle = currentWord;
+            if (!currentWord) return; // Don't draw if currentWord is not set
+            ctx.fillStyle = currentWord; // Use the color name string directly if it's a valid CSS color
             ctx.strokeStyle = 'rgba(0,0,0,0.7)';
             ctx.lineWidth = Math.max(2, Math.min(canvas.width, canvas.height) * 0.008);
             const baseFontSize = Math.min(canvas.width / (currentWord.length * 0.7 + 1), canvas.height * 0.2);
@@ -379,7 +436,7 @@
         }
 
         function handleInteraction(event) {
-            unlockAudio();
+            unlockAudio(); // Ensure audio is unlocked on first interaction
             if (isCelebrating) return;
             const rect = canvas.getBoundingClientRect();
             let clientX, clientY;
@@ -428,7 +485,7 @@
                 isCelebrating = true;
                 playAudio(yaySound);
                 for (let i = 0; i < CONFETTI_COUNT; i++) { confetti.push(new ConfettiParticle()); }
-                const celebrationDuration = (CONFETTI_LIFE * (1000 / 60)) * 1.2 + 500;
+                const celebrationDuration = (CONFETTI_LIFE * (1000 / 60)) * 1.2 + 500; // Adjusted for 60fps
                 celebrationTimeout = setTimeout(() => {
                     celebrationTimeout = null;
                     if (isCelebrating) { startNextLevel(); }
@@ -467,6 +524,7 @@
 
             window.addEventListener('resize', setCanvasSize);
 
+            // Attempt to unlock audio on first user interaction with the body
             document.body.addEventListener('click', unlockAudio, { once: true });
             document.body.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
 
@@ -476,7 +534,7 @@
             // --- PWA Service Worker Registration ---
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', () => {
-                    navigator.serviceWorker.register('./sw.js') // Make sure sw.js is in the same directory
+                    navigator.serviceWorker.register('./sw.js')
                         .then(registration => {
                             console.log('ServiceWorker registration successful with scope: ', registration.scope);
                         })
