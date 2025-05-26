@@ -8,83 +8,80 @@
         body {
             margin: 0;
             overflow: hidden; /* Prevent scrollbars */
-            display: flex;
-            flex-direction: column; /* To stack button and canvas */
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: #f0f0f0;
+            background-color: #E0F7FA; /* Light cyan background, less stark than white */
             font-family: 'Arial Rounded MT Bold', 'Helvetica Rounded', Arial, sans-serif;
             touch-action: none; /* Prevent default touch behaviors like scrolling/zooming */
-        }
-        #gameContainer {
-            position: relative; /* For positioning button over canvas if needed */
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            /* display: flex; /* Not strictly needed if canvas fills body */
+            /* justify-content: center; */
+            /* align-items: center; */
+            height: 100vh;
         }
         #gameCanvas {
-            border: 2px solid #333;
-            background-color: #fff;
+            display: block; /* Important to fill space correctly and remove potential margin */
+            /* border: none; Removed */
+            /* background-color: transparent; Will draw on body background */
             cursor: pointer;
-            /* Max width/height will be controlled by JS now for better fullscreen transition */
         }
         #fullscreenButton {
-            position: fixed; /* Fixed position relative to viewport */
-            bottom: 10px;
-            right: 10px;
-            padding: 10px 15px;
-            font-size: 16px;
-            background-color: #4CAF50;
+            position: fixed;
+            bottom: 15px;
+            right: 15px;
+            padding: 12px 18px;
+            font-size: 18px;
+            background-color: #FF9800; /* Orange button */
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: 8px;
             cursor: pointer;
-            z-index: 1000; /* Ensure it's on top */
+            z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: background-color 0.3s ease;
         }
         #fullscreenButton:hover {
-            background-color: #45a049;
+            background-color: #F57C00; /* Darker orange on hover */
         }
 
-        /* Styles when in fullscreen to hide scrollbars and ensure body fills screen */
+        /* Styles when in fullscreen */
         :fullscreen, :webkitIsFullScreen, :mozFullScreen {
-            overflow: hidden !important; /* Important to override any body overflow */
+            overflow: hidden !important;
         }
         body:fullscreen, body:-webkit-full-screen, body:-moz-full-screen {
             width: 100%;
             height: 100%;
-            /* Ensure no margins or padding interfere */
             margin: 0;
             padding: 0;
         }
-
     </style>
 </head>
 <body>
-    <div id="gameContainer">
-        <canvas id="gameCanvas"></canvas>
-    </div>
-    <button id="fullscreenButton">Fullscreen</button>
+    <!-- Canvas is now the main content area -->
+    <canvas id="gameCanvas"></canvas>
+    <button id="fullscreenButton">Go Fullscreen</button>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const fullscreenButton = document.getElementById('fullscreenButton');
-        const gameContainer = document.getElementById('gameContainer'); // Will be our fullscreen target
+
+        // --- Audio Files ---
+        // IMPORTANT: Place pop1.mp3, pop2.mp3, pop3.mp3, fail.mp3, yay.mp3 in the same directory as this HTML file.
+        const popSounds = [new Audio('pop1.mp3'), new Audio('pop2.mp3'), new Audio('pop3.mp3')];
+        const failSound = new Audio('fail.mp3');
+        const yaySound = new Audio('yay.mp3');
 
         // --- Game Configuration ---
-        const GAME_COLORS = ['red', 'green', 'yellow', 'blue', 'purple', 'orange', 'pink', 'brown'];
-        const BUBBLE_RADIUS_MIN = 35;
-        const BUBBLE_RADIUS_MAX = 60;
+        const GAME_COLORS = ['red', 'green', 'yellow', 'blue', 'purple', 'orange', 'pink', 'brown', 'teal', 'lime'];
+        const BUBBLE_RADIUS_BASE_MIN = 30; // Base radius, will be scaled
+        const BUBBLE_RADIUS_BASE_MAX = 55;
         const NUM_BUBBLES_MIN = 4;
         const NUM_BUBBLES_MAX = 7;
-        const BUBBLE_SPEED_MAX = 0.8;
-        const BUBBLE_OPACITY = 0.75;
-        const PARTICLE_COUNT = 25;
-        const PARTICLE_SPEED = 2.5;
-        const PARTICLE_LIFE = 70;
-        const CONFETTI_COUNT = 180;
-        const CONFETTI_LIFE = 150;
+        const BUBBLE_SPEED_MAX = 0.7; // Slightly slower
+        const BUBBLE_OPACITY = 0.8; // Slightly more opaque
+        const PARTICLE_COUNT = 30; // More particles
+        const PARTICLE_SPEED = 2.8;
+        const PARTICLE_LIFE = 75;
+        const CONFETTI_COUNT = 200; // More confetti
+        const CONFETTI_LIFE = 160;
 
         // --- Game State ---
         let currentColorIndex = 0;
@@ -96,106 +93,80 @@
         let level = 0;
         let celebrationTimeout = null;
         let isCelebrating = false;
+        let audioUnlocked = false; // To handle initial audio play restrictions
 
         // --- Utility Functions ---
         function getRandom(min, max) {
             return Math.random() * (max - min) + min;
         }
 
+        function playAudio(audioElement) {
+            if (audioElement && audioUnlocked) {
+                audioElement.pause();
+                audioElement.currentTime = 0;
+                audioElement.play().catch(error => console.warn(`Audio play failed for ${audioElement.src}:`, error));
+            } else if (audioElement && !audioUnlocked) {
+                // Queue it or try to play after first interaction (handled by unlockAudio)
+                console.log("Audio queued, waiting for user interaction to unlock.");
+            }
+        }
+
+        function unlockAudio() {
+            if (!audioUnlocked) {
+                audioUnlocked = true;
+                // Try playing a silent bit of sound from one of the files to "wake up" the audio context
+                // This is often needed for Safari and some mobile browsers.
+                const testSound = popSounds[0] || failSound || yaySound;
+                if (testSound) {
+                    const originalVolume = testSound.volume;
+                    testSound.volume = 0;
+                    testSound.play().then(() => {
+                        testSound.pause();
+                        testSound.currentTime = 0;
+                        testSound.volume = originalVolume;
+                        console.log("Audio context unlocked.");
+                    }).catch(e => console.warn("Audio unlock attempt failed silently:", e));
+                }
+            }
+        }
+
+
         function setCanvasSize() {
-            const isFullScreen = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
-            let parentWidth, parentHeight;
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
 
-            if (isFullScreen) {
-                parentWidth = window.innerWidth; // Use full screen dimensions
-                parentHeight = window.innerHeight;
-            } else {
-                parentWidth = window.innerWidth * 0.95; // Use viewport dimensions with some padding
-                parentHeight = window.innerHeight * 0.95;
-            }
-
-            const maxWidth = 1000; // Max dimensions for non-fullscreen
-            const maxHeight = 750;
-            let aspectRatio = 4/3; // Desired aspect ratio
-
-            let w = parentWidth;
-            let h = parentHeight;
-
-            if (w / h > aspectRatio) {
-                w = h * aspectRatio;
-            } else {
-                h = w / aspectRatio;
-            }
-
-            if (!isFullScreen) {
-                canvas.width = Math.min(w, maxWidth);
-                canvas.height = Math.min(h, maxHeight);
-            } else {
-                canvas.width = w; // Use full available space in fullscreen
-                canvas.height = h;
-            }
-            
-            // Center the gameContainer if canvas is smaller than window (non-fullscreen)
-            if (!isFullScreen) {
-                gameContainer.style.width = `${canvas.width}px`;
-                gameContainer.style.height = `${canvas.height}px`;
-            } else {
-                gameContainer.style.width = `100%`;
-                gameContainer.style.height = `100%`;
-            }
-
-
-            // Redraw if game is active
-            if (!isCelebrating && currentWord) {
-                 draw(); // Redraw the current state
-            } else if (isCelebrating) {
-                draw(); // Also redraw during celebration
+            // Redraw immediately if game is active
+            if (currentWord) {
+                 draw();
             }
         }
 
         // --- Fullscreen API Handling ---
-        function toggleFullScreen() {
-            const elem = document.documentElement; // Make the whole page fullscreen
-
+        function requestUserFullScreen() {
+            unlockAudio(); // Attempt to unlock audio on fullscreen request
+            const elem = document.documentElement;
             if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
                 if (elem.requestFullscreen) {
-                    elem.requestFullscreen().catch(err => {
-                        // alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
-                        console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
-                    });
-                } else if (elem.mozRequestFullScreen) { /* Firefox */
-                    elem.mozRequestFullScreen();
-                } else if (elem.webkitRequestFullscreen) { /* Chrome, Safari & Opera */
-                    elem.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
-                } else if (elem.msRequestFullscreen) { /* IE/Edge */
-                    elem.msRequestFullscreen();
-                }
-            } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                } else if (document.mozCancelFullScreen) { /* Firefox */
-                    document.mozCancelFullScreen();
-                } else if (document.webkitExitFullscreen) { /* Chrome, Safari and Opera */
-                    document.webkitExitFullscreen();
-                } else if (document.msExitFullscreen) { /* IE/Edge */
-                    document.msExitFullscreen();
-                }
+                    elem.requestFullscreen().catch(err => console.error("Fullscreen request failed:", err));
+                } else if (elem.mozRequestFullScreen) { elem.mozRequestFullScreen(); }
+                else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT); }
+                else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
             }
         }
 
-        function updateFullscreenButton() {
+        function updateFullscreenButtonVisibility() {
             if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement) {
-                fullscreenButton.textContent = 'Exit Fullscreen';
+                fullscreenButton.style.display = 'none'; // Hide button in fullscreen
             } else {
-                fullscreenButton.textContent = 'Fullscreen';
+                fullscreenButton.style.display = 'block'; // Show button when not in fullscreen
             }
         }
 
-        fullscreenButton.addEventListener('click', toggleFullScreen);
-        document.addEventListener('fullscreenchange', updateFullscreenButton);
-        document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
-        document.addEventListener('mozfullscreenchange', updateFullscreenButton);
-        document.addEventListener('MSFullscreenChange', updateFullscreenButton);
+        fullscreenButton.addEventListener('click', requestUserFullScreen);
+        document.addEventListener('fullscreenchange', updateFullscreenButtonVisibility);
+        document.addEventListener('webkitfullscreenchange', updateFullscreenButtonVisibility);
+        document.addEventListener('mozfullscreenchange', updateFullscreenButtonVisibility);
+        document.addEventListener('MSFullscreenChange', updateFullscreenButtonVisibility);
 
 
         // --- Bubble Class ---
@@ -229,7 +200,6 @@
 
             update() {
                 if (this.isPopped) return;
-
                 this.x += this.dx;
                 this.y += this.dy;
 
@@ -244,10 +214,13 @@
             }
 
             pop() {
-                if (this.isWrong) return false;
+                if (this.isWrong) return false; // Wrong balloons handled in handleInteraction for sound
                 if (this.isPopped) return false;
 
                 this.isPopped = true;
+                const randomPopSound = popSounds[Math.floor(Math.random() * popSounds.length)];
+                playAudio(randomPopSound);
+
                 for (let i = 0; i < PARTICLE_COUNT; i++) {
                     particles.push(new Particle(this.x, this.y, this.color, this.radius * 0.3));
                 }
@@ -260,15 +233,14 @@
             constructor(x, y, color, initialSize) {
                 this.x = x;
                 this.y = y;
-                this.radius = getRandom(initialSize * 0.2, initialSize * 0.5);
+                this.radius = getRandom(Math.max(1, initialSize * 0.2), initialSize * 0.5);
                 this.color = color;
                 this.dx = getRandom(-PARTICLE_SPEED, PARTICLE_SPEED);
                 this.dy = getRandom(-PARTICLE_SPEED, PARTICLE_SPEED);
                 this.life = PARTICLE_LIFE;
                 this.opacity = 1;
             }
-
-            draw() {
+            draw() { /* ... same as before ... */ 
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
                 ctx.fillStyle = this.color;
@@ -276,8 +248,7 @@
                 ctx.fill();
                 ctx.globalAlpha = 1.0;
             }
-
-            update() {
+            update() { /* ... same as before, with shrink ... */
                 this.x += this.dx;
                 this.y += this.dy;
                 this.dy += 0.03;
@@ -289,7 +260,7 @@
 
         // --- Confetti Particle Class ---
         class ConfettiParticle {
-            constructor() {
+            constructor() { /* ... same as before ... */ 
                 this.x = Math.random() * canvas.width;
                 this.y = Math.random() * canvas.height - canvas.height;
                 this.size = getRandom(8, 20);
@@ -301,8 +272,7 @@
                 this.angle = Math.random() * Math.PI * 2;
                 this.spin = getRandom(-0.15, 0.15);
             }
-
-            draw() {
+            draw() { /* ... same as before ... */ 
                 ctx.save();
                 ctx.translate(this.x, this.y);
                 ctx.rotate(this.angle);
@@ -326,8 +296,7 @@
                 ctx.restore();
                 ctx.globalAlpha = 1.0;
             }
-
-            update() {
+            update() { /* ... same as before ... */ 
                 this.x += this.dx;
                 this.y += this.dy;
                 this.angle += this.spin;
@@ -355,31 +324,28 @@
             confetti = [];
             isCelebrating = false;
             clearTimeout(celebrationTimeout);
-            // Make sure canvas is sized correctly for the new level
-            setCanvasSize(); // Call this to ensure canvas is ready before drawing bubbles
+            setCanvasSize(); // Ensure canvas is sized before placing bubbles
+
+            // Scale factor for bubble radius based on shorter screen dimension
+            const scaleFactor = Math.min(canvas.width, canvas.height) / 600; // 600 is a reference dimension
 
             const numBubbles = Math.floor(getRandom(NUM_BUBBLES_MIN, NUM_BUBBLES_MAX + 1));
             for (let i = 0; i < numBubbles; i++) {
                 let radius, x, y, validPosition;
-                let attempts = 0; // Prevent infinite loop
+                let attempts = 0;
                 do {
                     validPosition = true;
-                    radius = getRandom(BUBBLE_RADIUS_MIN * (canvas.width/800), BUBBLE_RADIUS_MAX * (canvas.width/800)); // Scale radius
-                    radius = Math.max(20, radius); // Minimum radius
+                    radius = getRandom(BUBBLE_RADIUS_BASE_MIN * scaleFactor, BUBBLE_RADIUS_BASE_MAX * scaleFactor);
+                    radius = Math.max(20, radius); // Min radius
                     x = getRandom(radius, canvas.width - radius);
                     y = getRandom(radius, canvas.height - radius);
                     for(const b of bubbles) {
                         const dist = Math.sqrt((x-b.x)**2 + (y-b.y)**2);
-                        if(dist < radius + b.radius + 10) {
-                            validPosition = false;
-                            break;
-                        }
+                        if(dist < radius + b.radius + 10) { validPosition = false; break; }
                     }
                     attempts++;
-                } while(!validPosition && attempts < 50); // Try 50 times
-                if (validPosition) { // Only push if a valid position was found
-                    bubbles.push(new Bubble(x, y, radius, currentWord));
-                }
+                } while(!validPosition && attempts < 50);
+                if (validPosition) { bubbles.push(new Bubble(x, y, radius, currentWord)); }
             }
 
             if (level > 2) {
@@ -393,94 +359,87 @@
                      let attempts = 0;
                     do {
                         validPosition = true;
-                        radius = getRandom(BUBBLE_RADIUS_MIN * (canvas.width/800), BUBBLE_RADIUS_MAX * (canvas.width/800));
+                        radius = getRandom(BUBBLE_RADIUS_BASE_MIN * scaleFactor, BUBBLE_RADIUS_BASE_MAX * scaleFactor);
                         radius = Math.max(20, radius);
                         x = getRandom(radius, canvas.width - radius);
                         y = getRandom(radius, canvas.height - radius);
                         for(const b of [...bubbles, ...wrongBalloons]) {
                             const dist = Math.sqrt((x-b.x)**2 + (y-b.y)**2);
-                            if(dist < radius + b.radius + 10) {
-                                validPosition = false;
-                                break;
-                            }
+                            if(dist < radius + b.radius + 10) { validPosition = false; break; }
                         }
                         attempts++;
                     } while(!validPosition && attempts < 50);
-                    if(validPosition) {
-                        wrongBalloons.push(new Bubble(x, y, radius, wrongColor, true));
-                    }
+                    if(validPosition) { wrongBalloons.push(new Bubble(x, y, radius, wrongColor, true)); }
                 }
             }
 
             currentColorIndex = (currentColorIndex + 1) % GAME_COLORS.length;
-            if (currentColorIndex === 0 && level > GAME_COLORS.length) {
-                shuffleArray(GAME_COLORS);
-            }
+            if (currentColorIndex === 0 && level > GAME_COLORS.length) { shuffleArray(GAME_COLORS); }
         }
         
-        function shuffleArray(array) {
+        function shuffleArray(array) { /* ... same as before ... */ 
             for (let i = array.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [array[i], array[j]] = [array[j], array[i]];
             }
         }
 
-
         function drawWord() {
             ctx.fillStyle = currentWord;
-            ctx.strokeStyle = 'black';
-            ctx.lineWidth = Math.max(2, canvas.width * 0.005); // Scale line width
-            const baseFontSize = Math.min(canvas.width / (currentWord.length * 0.8 + 2), canvas.height * 0.15);
-            const fontSize = Math.max(24, baseFontSize); // Minimum font size
+            ctx.strokeStyle = 'rgba(0,0,0,0.7)'; // Slightly softer black
+            ctx.lineWidth = Math.max(2, Math.min(canvas.width, canvas.height) * 0.008);
+            const baseFontSize = Math.min(canvas.width / (currentWord.length * 0.7 + 1), canvas.height * 0.2);
+            const fontSize = Math.max(30, baseFontSize);
             ctx.font = `bold ${fontSize}px 'Arial Rounded MT Bold', 'Helvetica Rounded', Arial, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-
             ctx.strokeText(currentWord.toUpperCase(), canvas.width / 2, canvas.height / 2);
             ctx.fillText(currentWord.toUpperCase(), canvas.width / 2, canvas.height / 2);
         }
 
         function handleInteraction(event) {
+            unlockAudio(); // Ensure audio is unlocked on any interaction
             if (isCelebrating) return;
 
             const rect = canvas.getBoundingClientRect();
             let clientX, clientY;
 
-            if (event.type.startsWith('mouse')) {
-                clientX = event.clientX;
-                clientY = event.clientY;
-            } else if (event.type.startsWith('touch')) {
+            if (event.type.startsWith('mouse')) { clientX = event.clientX; clientY = event.clientY; }
+            else if (event.type.startsWith('touch')) {
                 if (event.touches.length === 0) return;
-                clientX = event.touches[0].clientX;
-                clientY = event.touches[0].clientY;
+                clientX = event.touches[0].clientX; clientY = event.touches[0].clientY;
                 event.preventDefault();
-            } else {
-                return;
-            }
+            } else { return; }
 
-            const x = (clientX - rect.left) * (canvas.width / rect.width); // Scale click to canvas internal resolution
+            const x = (clientX - rect.left) * (canvas.width / rect.width);
             const y = (clientY - rect.top) * (canvas.height / rect.height);
 
-
+            // Check correct bubbles first
             for (let i = bubbles.length - 1; i >= 0; i--) {
                 const bubble = bubbles[i];
                 if (bubble.isPopped) continue;
                 const distance = Math.sqrt((x - bubble.x) ** 2 + (y - bubble.y) ** 2);
                 if (distance < bubble.radius) {
-                    if (bubble.pop()) {
+                    if (bubble.pop()) { // Pop sound is played inside bubble.pop()
                         return;
                     }
                 }
             }
+            // Check wrong balloons
             for (let i = wrongBalloons.length - 1; i >= 0; i--) {
                 const balloon = wrongBalloons[i];
                 const distance = Math.sqrt((x - balloon.x) ** 2 + (y - balloon.y) ** 2);
                 if (distance < balloon.radius) {
+                    playAudio(failSound);
+                    // Optional: Add a small visual "boing" effect
+                    balloon.dx += getRandom(-0.5, 0.5);
+                    balloon.dy += getRandom(-0.5, 0.5);
+                    balloon.x += getRandom(-3,3); // Jiggle
+                    balloon.y += getRandom(-3,3);
                     return;
                 }
             }
         }
-
 
         function update() {
             if (isCelebrating) {
@@ -491,20 +450,17 @@
 
             [...bubbles, ...wrongBalloons].forEach(b => b.update());
             particles.forEach(p => p.update());
-            particles = particles.filter(p => p.life > 0 && p.radius > 0);
+            particles = particles.filter(p => p.life > 0 && p.radius > 0.1); // Keep them a bit longer
 
             const activeBubbles = bubbles.filter(b => !b.isPopped);
             if (activeBubbles.length === 0 && bubbles.length > 0 && !isCelebrating) {
                 isCelebrating = true;
-                for (let i = 0; i < CONFETTI_COUNT; i++) {
-                    confetti.push(new ConfettiParticle());
-                }
+                playAudio(yaySound);
+                for (let i = 0; i < CONFETTI_COUNT; i++) { confetti.push(new ConfettiParticle()); }
                 const celebrationDuration = (CONFETTI_LIFE * (1000 / 60)) * 1.2 + 500;
                 celebrationTimeout = setTimeout(() => {
                     celebrationTimeout = null;
-                    if (isCelebrating) {
-                       startNextLevel();
-                    }
+                    if (isCelebrating) { startNextLevel(); }
                 }, celebrationDuration);
             }
         }
@@ -513,17 +469,15 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             if (isCelebrating) {
-                const fontSize = Math.max(30, canvas.height * 0.2);
-                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                const fontSize = Math.max(30, Math.min(canvas.width, canvas.height) * 0.25);
+                ctx.fillStyle = 'rgba(0,100,0,0.7)'; // Dark green for YAY
                 ctx.font = `bold ${fontSize}px 'Arial Rounded MT Bold'`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText("YAY!", canvas.width / 2, canvas.height / 2);
                 confetti.forEach(c => c.draw());
             } else {
-                if (currentWord) { // Only draw word if it's set
-                   drawWord();
-                }
+                if (currentWord) { drawWord(); }
                 wrongBalloons.forEach(b => b.draw());
                 bubbles.forEach(b => b.draw());
                 particles.forEach(p => p.draw());
@@ -539,10 +493,14 @@
         function init() {
             setCanvasSize(); // Initial sizing
             shuffleArray(GAME_COLORS);
-            
-            window.addEventListener('resize', () => {
-                setCanvasSize(); // This will be called on fullscreen change too
-            });
+            updateFullscreenButtonVisibility(); // Set initial button state
+
+            window.addEventListener('resize', setCanvasSize); // Handles both regular resize and fullscreen changes
+
+            // Add a general click/touch listener to unlock audio context as early as possible
+            document.body.addEventListener('click', unlockAudio, { once: true });
+            document.body.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
+
 
             canvas.addEventListener('mousedown', handleInteraction);
             canvas.addEventListener('touchstart', handleInteraction, { passive: false });
