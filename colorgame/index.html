@@ -4,22 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Color Pop Game</title>
+
+    <!-- PWA Manifest and Theme Color -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#FF9800"> <!-- Corresponds to manifest theme_color -->
+
     <style>
         body {
             margin: 0;
             overflow: hidden; /* Prevent scrollbars */
-            background-color: #E0F7FA; /* Light cyan background, less stark than white */
+            background-color: #E0F7FA; /* Light cyan background */
             font-family: 'Arial Rounded MT Bold', 'Helvetica Rounded', Arial, sans-serif;
             touch-action: none; /* Prevent default touch behaviors like scrolling/zooming */
-            /* display: flex; /* Not strictly needed if canvas fills body */
-            /* justify-content: center; */
-            /* align-items: center; */
             height: 100vh;
         }
         #gameCanvas {
-            display: block; /* Important to fill space correctly and remove potential margin */
-            /* border: none; Removed */
-            /* background-color: transparent; Will draw on body background */
+            display: block;
             cursor: pointer;
         }
         #fullscreenButton {
@@ -54,7 +54,6 @@
     </style>
 </head>
 <body>
-    <!-- Canvas is now the main content area -->
     <canvas id="gameCanvas"></canvas>
     <button id="fullscreenButton">Go Fullscreen</button>
 
@@ -64,25 +63,22 @@
         const fullscreenButton = document.getElementById('fullscreenButton');
 
         // --- Audio Files ---
-        // IMPORTANT: Place pop1.mp3, pop2.mp3, pop3.mp3, fail.mp3, yay.mp3 in the same directory as this HTML file.
         const popSounds = [new Audio('pop1.mp3'), new Audio('pop2.mp3'), new Audio('pop3.mp3')];
         const failSound = new Audio('fail.mp3');
         const yaySound = new Audio('yay.mp3');
 
         // --- Game Configuration ---
-//        const GAME_COLORS = ['red', 'green', 'yellow', 'blue', 'purple', 'orange', 'pink', 'brown', 'teal', 'lime'];
-        const GAME_COLORS = ['red', 'green', 'yellow', 'blue', 'purple', 'orange', 'pink'];
-
-        const BUBBLE_RADIUS_BASE_MIN = 30; // Base radius, will be scaled
+        const GAME_COLORS = ['red', 'green', 'yellow', 'blue', 'purple', 'orange', 'pink', 'brown', 'teal', 'lime'];
+        const BUBBLE_RADIUS_BASE_MIN = 30;
         const BUBBLE_RADIUS_BASE_MAX = 55;
         const NUM_BUBBLES_MIN = 4;
         const NUM_BUBBLES_MAX = 7;
-        const BUBBLE_SPEED_MAX = 0.7; // Slightly slower
-        const BUBBLE_OPACITY = 0.8; // Slightly more opaque
-        const PARTICLE_COUNT = 30; // More particles
+        const BUBBLE_SPEED_MAX = 0.7;
+        const BUBBLE_OPACITY = 0.8;
+        const PARTICLE_COUNT = 30;
         const PARTICLE_SPEED = 2.8;
         const PARTICLE_LIFE = 75;
-        const CONFETTI_COUNT = 200; // More confetti
+        const CONFETTI_COUNT = 200;
         const CONFETTI_LIFE = 160;
 
         // --- Game State ---
@@ -95,7 +91,7 @@
         let level = 0;
         let celebrationTimeout = null;
         let isCelebrating = false;
-        let audioUnlocked = false; // To handle initial audio play restrictions
+        let audioUnlocked = false;
 
         // --- Utility Functions ---
         function getRandom(min, max) {
@@ -108,7 +104,6 @@
                 audioElement.currentTime = 0;
                 audioElement.play().catch(error => console.warn(`Audio play failed for ${audioElement.src}:`, error));
             } else if (audioElement && !audioUnlocked) {
-                // Queue it or try to play after first interaction (handled by unlockAudio)
                 console.log("Audio queued, waiting for user interaction to unlock.");
             }
         }
@@ -116,8 +111,6 @@
         function unlockAudio() {
             if (!audioUnlocked) {
                 audioUnlocked = true;
-                // Try playing a silent bit of sound from one of the files to "wake up" the audio context
-                // This is often needed for Safari and some mobile browsers.
                 const testSound = popSounds[0] || failSound || yaySound;
                 if (testSound) {
                     const originalVolume = testSound.volume;
@@ -132,12 +125,9 @@
             }
         }
 
-
         function setCanvasSize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-
-            // Redraw immediately if game is active
             if (currentWord) {
                  draw();
             }
@@ -145,7 +135,7 @@
 
         // --- Fullscreen API Handling ---
         function requestUserFullScreen() {
-            unlockAudio(); // Attempt to unlock audio on fullscreen request
+            unlockAudio();
             const elem = document.documentElement;
             if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
                 if (elem.requestFullscreen) {
@@ -158,9 +148,9 @@
 
         function updateFullscreenButtonVisibility() {
             if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement) {
-                fullscreenButton.style.display = 'none'; // Hide button in fullscreen
+                fullscreenButton.style.display = 'none';
             } else {
-                fullscreenButton.style.display = 'block'; // Show button when not in fullscreen
+                fullscreenButton.style.display = 'block';
             }
         }
 
@@ -169,7 +159,6 @@
         document.addEventListener('webkitfullscreenchange', updateFullscreenButtonVisibility);
         document.addEventListener('mozfullscreenchange', updateFullscreenButtonVisibility);
         document.addEventListener('MSFullscreenChange', updateFullscreenButtonVisibility);
-
 
         // --- Bubble Class ---
         class Bubble {
@@ -184,7 +173,6 @@
                 this.isPopped = false;
                 this.isWrong = isWrong;
             }
-
             draw() {
                 if (this.isPopped) return;
                 ctx.beginPath();
@@ -193,18 +181,15 @@
                 ctx.globalAlpha = this.opacity;
                 ctx.fill();
                 ctx.globalAlpha = 1.0;
-
                 ctx.beginPath();
                 ctx.arc(this.x - this.radius * 0.3, this.y - this.radius * 0.3, this.radius * 0.25, 0, Math.PI * 2);
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
                 ctx.fill();
             }
-
             update() {
                 if (this.isPopped) return;
                 this.x += this.dx;
                 this.y += this.dy;
-
                 if (this.x + this.radius > canvas.width || this.x - this.radius < 0) {
                     this.dx *= -1;
                     this.x = Math.max(this.radius, Math.min(this.x, canvas.width - this.radius));
@@ -214,15 +199,12 @@
                     this.y = Math.max(this.radius, Math.min(this.y, canvas.height - this.radius));
                 }
             }
-
             pop() {
-                if (this.isWrong) return false; // Wrong balloons handled in handleInteraction for sound
+                if (this.isWrong) return false;
                 if (this.isPopped) return false;
-
                 this.isPopped = true;
                 const randomPopSound = popSounds[Math.floor(Math.random() * popSounds.length)];
                 playAudio(randomPopSound);
-
                 for (let i = 0; i < PARTICLE_COUNT; i++) {
                     particles.push(new Particle(this.x, this.y, this.color, this.radius * 0.3));
                 }
@@ -242,7 +224,7 @@
                 this.life = PARTICLE_LIFE;
                 this.opacity = 1;
             }
-            draw() { /* ... same as before ... */ 
+            draw() {
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
                 ctx.fillStyle = this.color;
@@ -250,7 +232,7 @@
                 ctx.fill();
                 ctx.globalAlpha = 1.0;
             }
-            update() { /* ... same as before, with shrink ... */
+            update() {
                 this.x += this.dx;
                 this.y += this.dy;
                 this.dy += 0.03;
@@ -262,7 +244,7 @@
 
         // --- Confetti Particle Class ---
         class ConfettiParticle {
-            constructor() { /* ... same as before ... */ 
+            constructor() {
                 this.x = Math.random() * canvas.width;
                 this.y = Math.random() * canvas.height - canvas.height;
                 this.size = getRandom(8, 20);
@@ -274,7 +256,7 @@
                 this.angle = Math.random() * Math.PI * 2;
                 this.spin = getRandom(-0.15, 0.15);
             }
-            draw() { /* ... same as before ... */ 
+            draw() {
                 ctx.save();
                 ctx.translate(this.x, this.y);
                 ctx.rotate(this.angle);
@@ -298,7 +280,7 @@
                 ctx.restore();
                 ctx.globalAlpha = 1.0;
             }
-            update() { /* ... same as before ... */ 
+            update() {
                 this.x += this.dx;
                 this.y += this.dy;
                 this.angle += this.spin;
@@ -306,7 +288,6 @@
                 this.opacity = Math.max(0, this.life / CONFETTI_LIFE);
                 if (this.dy < 6) this.dy += 0.06;
                 if (this.dx > 0) this.dx -= 0.015; else if (this.dx < 0) this.dx += 0.015;
-
                 if (this.y > canvas.height + this.size && this.dy > 0 && this.life > CONFETTI_LIFE * 0.2) {
                     this.y = canvas.height + this.size;
                     this.dy *= -0.6;
@@ -326,10 +307,9 @@
             confetti = [];
             isCelebrating = false;
             clearTimeout(celebrationTimeout);
-            setCanvasSize(); // Ensure canvas is sized before placing bubbles
+            setCanvasSize();
 
-            // Scale factor for bubble radius based on shorter screen dimension
-            const scaleFactor = Math.min(canvas.width, canvas.height) / 600; // 600 is a reference dimension
+            const scaleFactor = Math.min(canvas.width, canvas.height) / 600;
 
             const numBubbles = Math.floor(getRandom(NUM_BUBBLES_MIN, NUM_BUBBLES_MAX + 1));
             for (let i = 0; i < numBubbles; i++) {
@@ -338,7 +318,7 @@
                 do {
                     validPosition = true;
                     radius = getRandom(BUBBLE_RADIUS_BASE_MIN * scaleFactor, BUBBLE_RADIUS_BASE_MAX * scaleFactor);
-                    radius = Math.max(20, radius); // Min radius
+                    radius = Math.max(20, radius);
                     x = getRandom(radius, canvas.width - radius);
                     y = getRandom(radius, canvas.height - radius);
                     for(const b of bubbles) {
@@ -374,12 +354,11 @@
                     if(validPosition) { wrongBalloons.push(new Bubble(x, y, radius, wrongColor, true)); }
                 }
             }
-
             currentColorIndex = (currentColorIndex + 1) % GAME_COLORS.length;
             if (currentColorIndex === 0 && level > GAME_COLORS.length) { shuffleArray(GAME_COLORS); }
         }
         
-        function shuffleArray(array) { /* ... same as before ... */ 
+        function shuffleArray(array) {
             for (let i = array.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [array[i], array[j]] = [array[j], array[i]];
@@ -388,7 +367,7 @@
 
         function drawWord() {
             ctx.fillStyle = currentWord;
-            ctx.strokeStyle = 'rgba(0,0,0,0.7)'; // Slightly softer black
+            ctx.strokeStyle = 'rgba(0,0,0,0.7)';
             ctx.lineWidth = Math.max(2, Math.min(canvas.width, canvas.height) * 0.008);
             const baseFontSize = Math.min(canvas.width / (currentWord.length * 0.7 + 1), canvas.height * 0.2);
             const fontSize = Math.max(30, baseFontSize);
@@ -400,43 +379,35 @@
         }
 
         function handleInteraction(event) {
-            unlockAudio(); // Ensure audio is unlocked on any interaction
+            unlockAudio();
             if (isCelebrating) return;
-
             const rect = canvas.getBoundingClientRect();
             let clientX, clientY;
-
             if (event.type.startsWith('mouse')) { clientX = event.clientX; clientY = event.clientY; }
             else if (event.type.startsWith('touch')) {
                 if (event.touches.length === 0) return;
                 clientX = event.touches[0].clientX; clientY = event.touches[0].clientY;
                 event.preventDefault();
             } else { return; }
-
             const x = (clientX - rect.left) * (canvas.width / rect.width);
             const y = (clientY - rect.top) * (canvas.height / rect.height);
 
-            // Check correct bubbles first
             for (let i = bubbles.length - 1; i >= 0; i--) {
                 const bubble = bubbles[i];
                 if (bubble.isPopped) continue;
                 const distance = Math.sqrt((x - bubble.x) ** 2 + (y - bubble.y) ** 2);
                 if (distance < bubble.radius) {
-                    if (bubble.pop()) { // Pop sound is played inside bubble.pop()
-                        return;
-                    }
+                    if (bubble.pop()) { return; }
                 }
             }
-            // Check wrong balloons
             for (let i = wrongBalloons.length - 1; i >= 0; i--) {
                 const balloon = wrongBalloons[i];
                 const distance = Math.sqrt((x - balloon.x) ** 2 + (y - balloon.y) ** 2);
                 if (distance < balloon.radius) {
                     playAudio(failSound);
-                    // Optional: Add a small visual "boing" effect
                     balloon.dx += getRandom(-0.5, 0.5);
                     balloon.dy += getRandom(-0.5, 0.5);
-                    balloon.x += getRandom(-3,3); // Jiggle
+                    balloon.x += getRandom(-3,3);
                     balloon.y += getRandom(-3,3);
                     return;
                 }
@@ -449,11 +420,9 @@
                 confetti = confetti.filter(c => c.life > 0 || c.y < canvas.height + c.size * 2);
                 return;
             }
-
             [...bubbles, ...wrongBalloons].forEach(b => b.update());
             particles.forEach(p => p.update());
-            particles = particles.filter(p => p.life > 0 && p.radius > 0.1); // Keep them a bit longer
-
+            particles = particles.filter(p => p.life > 0 && p.radius > 0.1);
             const activeBubbles = bubbles.filter(b => !b.isPopped);
             if (activeBubbles.length === 0 && bubbles.length > 0 && !isCelebrating) {
                 isCelebrating = true;
@@ -469,10 +438,9 @@
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
             if (isCelebrating) {
                 const fontSize = Math.max(30, Math.min(canvas.width, canvas.height) * 0.25);
-                ctx.fillStyle = 'rgba(0,100,0,0.7)'; // Dark green for YAY
+                ctx.fillStyle = 'rgba(0,100,0,0.7)';
                 ctx.font = `bold ${fontSize}px 'Arial Rounded MT Bold'`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -493,19 +461,31 @@
         }
 
         function init() {
-            setCanvasSize(); // Initial sizing
+            setCanvasSize();
             shuffleArray(GAME_COLORS);
-            updateFullscreenButtonVisibility(); // Set initial button state
+            updateFullscreenButtonVisibility();
 
-            window.addEventListener('resize', setCanvasSize); // Handles both regular resize and fullscreen changes
+            window.addEventListener('resize', setCanvasSize);
 
-            // Add a general click/touch listener to unlock audio context as early as possible
             document.body.addEventListener('click', unlockAudio, { once: true });
             document.body.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
 
-
             canvas.addEventListener('mousedown', handleInteraction);
             canvas.addEventListener('touchstart', handleInteraction, { passive: false });
+
+            // --- PWA Service Worker Registration ---
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('./sw.js') // Make sure sw.js is in the same directory
+                        .then(registration => {
+                            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                        })
+                        .catch(error => {
+                            console.log('ServiceWorker registration failed: ', error);
+                        });
+                });
+            }
+            // --- End PWA Service Worker Registration ---
 
             startNextLevel();
             gameLoop();
