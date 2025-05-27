@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Number Match Game</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <style>
+        /* Basic Reset and Global Styles */
+        body, html {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Prevent scrollbars */
+            font-family: 'Inter', Arial, sans-serif;
+            background-color: #f0f8ff; /* Light AliceBlue background */
+            -webkit-tap-highlight-color: transparent; /* Disable tap highlight on mobile */
+        }
+
+        /* Game Container: Full viewport, flex column */
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+            user-select: none; /* Prevent text selection */
+            -webkit-user-select: none; /* Safari */
+            -moz-user-select: none; /* Firefox */
+            -ms-user-select: none; /* IE */
+        }
+
+        /* Target Number Area: Top 25% of screen */
+        #target-number-container {
+            height: 25vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #87CEEB; /* Sky Blue */
+            border-bottom: 5px solid #4682B4; /* Steel Blue border */
+            box-sizing: border-box;
+        }
+
+        #target-number-display {
+            font-size: clamp(8vh, 12vw, 15vh); /* Responsive font size for number */
+            font-weight: 700; /* Bolder */
+            color: #ffffff; /* White text */
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2); /* Subtle shadow for depth */
+            padding: 0 2vw;
+        }
+
+        /* Number Options Area: Bottom 75% of screen, flex row */
+        #number-options-container {
+            height: 75vh;
+            display: flex;
+            justify-content: space-around; /* Space out number options */
+            align-items: center; /* Vertically center numbers */
+            padding: 2vh; /* Padding around number options */
+            box-sizing: border-box;
+            gap: 2vw; /* Gap between number options */
+        }
+
+        /* Number Option: Clickable area for each number */
+        .number-option {
+            flex: 1; /* Each option takes equal width */
+            height: calc(100% - 4vh); /* Fill most of the container height */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: clamp(10vh, 18vw, 20vh); /* Large number character */
+            cursor: pointer;
+            background-color: #ffffff; /* White background */
+            border-radius: 25px; /* Rounded corners */
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15); /* Softer shadow */
+            transition: transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out, opacity 0.3s ease-in-out;
+            overflow: hidden; /* Ensure number doesn't spill out */
+            text-align: center;
+        }
+
+        .number-option:active { /* Visual feedback on tap */
+            transform: scale(0.95);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .number-option.found {
+            opacity: 0.2;
+            pointer-events: none; /* Prevent clicking already found numbers */
+            /* Or use visibility: hidden; if preferred to completely remove */
+            /* visibility: hidden; */
+        }
+
+
+        /* Shake animation for incorrect answer */
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translateX(-2px); }
+            20%, 80% { transform: translateX(4px); }
+            30%, 50%, 70% { transform: translateX(-6px); }
+            40%, 60% { transform: translateX(6px); }
+        }
+
+        /* Fullscreen Button */
+        #fullscreen-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            font-size: 18px;
+            font-weight: 600;
+            color: white;
+            background-color: #5cb85c; /* Green */
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            z-index: 1000; /* Ensure it's on top */
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: background-color 0.2s;
+        }
+
+        #fullscreen-btn:hover {
+            background-color: #4cae4c; /* Darker green */
+        }
+         /* Error Modal Styles */
+        #error-modal {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 25px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            z-index: 2000;
+            text-align: center;
+            max-width: 80%;
+        }
+        #error-modal p {
+            margin-bottom: 20px;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+        #error-modal button {
+            padding: 10px 20px;
+            background-color: #5cb85c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #error-modal button:hover {
+            background-color: #4cae4c;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="target-number-container">
+            <span id="target-number-display">5</span>
+        </div>
+        <div id="number-options-container">
+            <div class="number-option" id="number-option-1" data-number=""></div>
+            <div class="number-option" id="number-option-2" data-number=""></div>
+            <div class="number-option" id="number-option-3" data-number=""></div>
+            <div class="number-option" id="number-option-4" data-number=""></div>
+        </div>
+    </div>
+    <button id="fullscreen-btn">Full Screen</button>
+
+    <script>
+        // DOM Elements
+        const targetNumberDisplay = document.getElementById('target-number-display');
+        const numberOptionsContainer = document.getElementById('number-options-container');
+        const numberOptionElements = [
+            document.getElementById('number-option-1'),
+            document.getElementById('number-option-2'),
+            document.getElementById('number-option-3'),
+            document.getElementById('number-option-4')
+        ];
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+
+        // Game State
+        let currentTargetNumber = null;
+        let correctNumbersToFindCount = 0;
+        let gameActive = true;
+
+        // Speech Synthesis
+        const synth = window.speechSynthesis;
+
+        // Fisher-Yates Shuffle Algorithm (to shuffle options)
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        // Speak Function
+        function speak(text, rate = 0.7, pitch = 1) {
+            if (synth.speaking) {
+                // synth.cancel(); // Optional: cancel ongoing speech immediately
+            }
+            const utterThis = new SpeechSynthesisUtterance(text);
+            utterThis.rate = rate;
+            utterThis.pitch = pitch;
+            // Optional: Configure voice
+            // const voices = synth.getVoices();
+            // utterThis.voice = voices[desiredVoiceIndex];
+            synth.speak(utterThis);
+        }
+
+
+        // Confetti Function
+        function blastConfetti() {
+            const count = 200;
+            const defaults = {
+                origin: { y: 0.6 },
+                spread: 180,
+                ticks: 100,
+                gravity: 0.8,
+                decay: 0.94,
+                startVelocity: 30,
+                scalar: 1
+            };
+
+            function fire(particleRatio, opts) {
+                confetti(Object.assign({}, defaults, opts, {
+                    particleCount: Math.floor(count * particleRatio)
+                }));
+            }
+
+            fire(0.25, { spread: 26, startVelocity: 55 });
+            fire(0.2, { spread: 60 });
+            fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+            fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+            fire(0.1, { spread: 120, startVelocity: 45 });
+        }
+
+        // Load Next Round
+        function nextRound() {
+            gameActive = false; // Deactivate game during setup
+            currentTargetNumber = Math.floor(Math.random() * 10) + 1; // Number between 1 and 10
+            targetNumberDisplay.textContent = currentTargetNumber;
+
+            // Speak the instruction after a brief delay to allow previous speech to finish
+            setTimeout(() => {
+                 speak(`Find the number ${currentTargetNumber}`, 0.6);
+            }, 100);
+
+
+            const numCorrectInstances = Math.floor(Math.random() * 3) + 1; // 1, 2, or 3 correct instances
+            correctNumbersToFindCount = numCorrectInstances;
+
+            let options = [];
+            for (let i = 0; i < numCorrectInstances; i++) {
+                options.push(currentTargetNumber);
+            }
+
+            const numDistractors = 4 - numCorrectInstances;
+            for (let i = 0; i < numDistractors; i++) {
+                let distractor;
+                do {
+                    distractor = Math.floor(Math.random() * 10) + 1;
+                } while (distractor === currentTargetNumber); // Ensure distractor is different
+                options.push(distractor);
+            }
+
+            shuffleArray(options);
+
+            numberOptionElements.forEach((el, index) => {
+                el.textContent = options[index];
+                el.dataset.number = options[index];
+                el.style.visibility = 'visible'; // Make it visible
+                el.classList.remove('found');    // Reset found status
+                el.classList.remove('shake');     // Reset shake status
+            });
+            
+            // Add a slight delay before re-activating the game to ensure setup is complete
+            // and speech has a chance to start
+            setTimeout(() => {
+                 gameActive = true;
+            }, 500); // Increased delay
+        }
+
+        // Handle Number Click
+        function handleNumberClick(event) {
+            if (!gameActive || !event.target.classList.contains('number-option') || event.target.classList.contains('found')) {
+                return;
+            }
+
+            const clickedElement = event.target;
+            const selectedNumber = parseInt(clickedElement.dataset.number);
+
+            if (selectedNumber === currentTargetNumber) {
+                speak(`Yes! ${selectedNumber}!`);
+                clickedElement.classList.add('found'); // Visually mark as found (e.g., fade out)
+                // clickedElement.style.visibility = 'hidden'; // Alternative: make it disappear
+
+                correctNumbersToFindCount--;
+
+                if (correctNumbersToFindCount === 0) {
+                    gameActive = false; // Deactivate game while celebrating
+                    blastConfetti();
+                    speak("Great job!", 0.7);
+                    setTimeout(nextRound, 3000); // Wait for confetti to finish
+                }
+            } else {
+                speak(`No, that's ${selectedNumber}`);
+                clickedElement.classList.add('shake');
+                setTimeout(() => {
+                    clickedElement.classList.remove('shake');
+                }, 600); // Duration of shake animation
+            }
+        }
+
+        // Attach Event Listeners
+        numberOptionsContainer.addEventListener('click', handleNumberClick);
+
+
+        // Fullscreen Functionality
+        fullscreenBtn.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen()
+                    .catch(err => {
+                        const existingModal = document.getElementById('error-modal');
+                        if (existingModal) {
+                            existingModal.remove();
+                        }
+
+                        const modal = document.createElement('div');
+                        modal.id = 'error-modal';
+
+                        const message = document.createElement('p');
+                        message.textContent = `Could not enter full-screen mode: ${err.message}. This might require direct user interaction (like a click) or your browser settings might prevent it.`;
+
+                        const closeButton = document.createElement('button');
+                        closeButton.textContent = 'OK';
+                        closeButton.onclick = () => {
+                            modal.remove();
+                        };
+
+                        modal.appendChild(message);
+                        modal.appendChild(closeButton);
+                        document.body.appendChild(modal);
+                    });
+            }
+        });
+
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                fullscreenBtn.style.display = 'none';
+            } else {
+                fullscreenBtn.style.display = 'block';
+            }
+        });
+
+        // Initialize Game on Load
+        document.addEventListener('DOMContentLoaded', () => {
+            gameActive = false; // Start as inactive until first round is fully set up
+            // A small delay to ensure speech synthesis is ready, especially on some browsers/devices.
+            // Some browsers require user interaction to initiate audio.
+            // This initial load might not speak until after the first click if that's the case.
+            setTimeout(() => {
+                nextRound();
+            }, 200); // Slightly longer initial delay for speech synth readiness
+        });
+    </script>
+</body>
+</html>
