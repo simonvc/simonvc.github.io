@@ -227,7 +227,10 @@
         let currentRoundData = null;
         let shuffledGameData = [...gameData]; // Create a mutable copy
         let currentWordIndex = -1;
-        let gameActive = true; // Start true, will be managed by logic
+        let gameActive = true;
+
+        // Speech Synthesis
+        const synth = window.speechSynthesis;
 
         // Fisher-Yates Shuffle Algorithm
         function shuffleArray(array) {
@@ -237,13 +240,26 @@
             }
         }
 
+        // Speak Instruction Function
+        function speakInstruction(word) {
+            if (synth.speaking) {
+                synth.cancel(); // Cancel any ongoing speech
+            }
+            const utterThis = new SpeechSynthesisUtterance(`Which one is the ${word}`);
+            // Optional: Configure voice, rate, pitch
+            // utterThis.voice = chosenVoice;
+            // utterThis.pitch = 1;
+            // utterThis.rate = 1;
+            synth.speak(utterThis);
+        }
+
         // Confetti Function
         function blastConfetti() {
-            const count = 200; 
+            const count = 200;
             const defaults = {
-                origin: { y: 0.6 }, 
-                spread: 180, 
-                ticks: 100, 
+                origin: { y: 0.6 },
+                spread: 180,
+                ticks: 100,
                 gravity: 0.8,
                 decay: 0.94,
                 startVelocity: 30,
@@ -262,17 +278,20 @@
             fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
             fire(0.1, { spread: 120, startVelocity: 45 });
         }
-        
+
         // Load Next Round
         function nextRound() {
             currentWordIndex++;
             if (currentWordIndex >= shuffledGameData.length) {
-                currentWordIndex = 0; 
-                shuffleArray(shuffledGameData); 
+                currentWordIndex = 0;
+                shuffleArray(shuffledGameData);
             }
 
             currentRoundData = shuffledGameData[currentWordIndex];
             wordTextElement.textContent = currentRoundData.word;
+
+            // Speak the instruction
+            speakInstruction(currentRoundData.word);
 
             const emojis = [currentRoundData.correctEmoji, currentRoundData.distractorEmoji];
             if (Math.random() < 0.5) {
@@ -286,11 +305,10 @@
                 emojiOption2.textContent = emojis[0];
                 emojiOption2.dataset.emoji = emojis[0];
             }
-            
-            // Re-enable interactions after a very brief pause for UI to update
+
             setTimeout(() => {
                 gameActive = true;
-            }, 50); // Short delay ensures rendering before next interaction
+            }, 50);
         }
 
         // Handle Emoji Click
@@ -298,23 +316,23 @@
             if (!gameActive || !currentRoundData || !event.target.classList.contains('emoji-option')) {
                 return;
             }
-            
-            gameActive = false; // Disable clicks immediately to prevent multiple submissions
+
+            gameActive = false;
 
             const clickedElement = event.target;
             const selectedEmoji = clickedElement.dataset.emoji;
 
             if (selectedEmoji === currentRoundData.correctEmoji) {
                 blastConfetti();
-                // Proceed to next round after a brief delay for confetti to start
-                setTimeout(nextRound, 100); // nextRound will re-enable gameActive
+                setTimeout(nextRound, 100);
             } else {
+                // Repeat the instruction if wrong
+                speakInstruction(currentRoundData.word);
                 clickedElement.classList.add('shake');
-                // Re-enable clicks after shake animation for incorrect answer
                 setTimeout(() => {
                     clickedElement.classList.remove('shake');
-                    gameActive = true; 
-                }, 600); 
+                    gameActive = true;
+                }, 600);
             }
         }
 
@@ -334,10 +352,10 @@
 
                         const modal = document.createElement('div');
                         modal.id = 'error-modal';
-                        
+
                         const message = document.createElement('p');
                         message.textContent = `Could not enter full-screen mode: ${err.message}. This might require direct user interaction (like a click) or your browser settings might prevent it.`;
-                        
+
                         const closeButton = document.createElement('button');
                         closeButton.textContent = 'OK';
                         closeButton.onclick = () => {
@@ -361,9 +379,14 @@
 
         // Initialize Game on Load
         document.addEventListener('DOMContentLoaded', () => {
-            gameActive = false; // Set inactive until first round is fully loaded
-            shuffleArray(shuffledGameData); 
-            nextRound(); // Load the first round; nextRound will set gameActive to true
+            gameActive = false;
+            shuffleArray(shuffledGameData);
+            // A small delay to ensure speech synthesis is ready, especially on some browsers/devices
+            // Also, some browsers require user interaction to initiate audio.
+            // This initial load might not speak until after the first click if that's the case.
+            setTimeout(() => {
+                nextRound();
+            }, 100);
         });
     </script>
 </body>
