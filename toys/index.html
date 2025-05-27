@@ -371,7 +371,6 @@
         }
 
         fullscreenButton.addEventListener('click', toggleFullScreen);
-        // Listen for fullscreen changes on the document
         document.addEventListener('fullscreenchange', handleFullscreenChange);
         document.addEventListener('mozfullscreenchange', handleFullscreenChange);
         document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
@@ -420,6 +419,16 @@
                         updateStarParticles(toy);
                     }
                 }
+
+                // Apply prograde rotation for rockets
+                if (toy.isRocket) {
+                    // Calculate the angle of movement.
+                    // Math.atan2(vy, vx) gives the angle in radians relative to the positive X-axis.
+                    // Add Math.PI / 2 (90 degrees) because the SVG rocket is oriented upwards by default.
+                    const angle = Math.atan2(toy.vy, toy.vx) + (Math.PI / 2);
+                    toy.element.style.transform = `rotate(${angle}rad)`;
+                }
+                
                 toy.element.style.left = `${toy.x}px`;
                 toy.element.style.top = `${toy.y}px`;
             });
@@ -451,8 +460,6 @@
 
         window.addEventListener('resize', () => {
             updateFloorBoundary(); 
-            // Potentially adjust toy positions if resize makes them go out of bounds
-            // or if fullscreen change significantly alters layout. For now, keeping it simple.
         });
     </script>
 </body>
