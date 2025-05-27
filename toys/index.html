@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toddler Toy Bounce</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden; 
+            user-select: none; 
+            -webkit-user-select: none; 
+            -ms-user-select: none; 
+        }
+        .emoji-toy {
+            transition: transform 0.1s ease-out;
+        }
+        .emoji-toy:active {
+            transform: scale(0.9);
+        }
+        .launched-toy {
+            touch-action: none; 
+            cursor: pointer; /* Indicate tappable */
+        }
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            z-index: 10; 
+            pointer-events: none; 
+        }
+        .pop-particle { /* Specific style for pop particles */
+            position: absolute;
+            border-radius: 50%;
+            z-index: 30; /* Pop particles on top of other toys */
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="bg-sky-100">
+
+    <div id="gameArea" class="fixed inset-0 z-0">
+        </div>
+
+    <div id="toyBar" class="fixed bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-blue-300/50 to-blue-200/50 flex justify-around items-center p-2 sm:p-4 z-10 shadow-lg rounded-t-xl">
+        </div>
+
+    <div id="countdownDisplay" class="fixed inset-0 flex flex-col justify-center items-center text-8xl sm:text-9xl font-bold text-orange-500 bg-black bg-opacity-75 hidden z-30">
+        <span id="countdownText">3</span>
+    </div>
+
+    <script type="module">
+        const gameArea = document.getElementById('gameArea');
+        const toyBar = document.getElementById('toyBar');
+        const countdownDisplay = document.getElementById('countdownDisplay');
+        const countdownText = document.getElementById('countdownText');
+
+        // Game parameters
+        const GRAVITY = 0.25; 
+        const INITIAL_KICK_VY = -7; 
+        const ROCKET_LAUNCH_VY = -14; 
+        const HORIZONTAL_KICK_RANGE = 5; 
+        const BOUNCE_DAMPING = 0.9; 
+
+        // Star Particle parameters
+        const MAX_PARTICLES_PER_STAR = 30;
+        const PARTICLE_LIFESPAN = 70; 
+        const PARTICLE_SPAWN_INTERVAL = 4; 
+
+        // Pop Particle parameters
+        const POP_PARTICLE_COUNT = 15;
+        const POP_PARTICLE_LIFESPAN = 40; // Shorter lifespan for pop
+        const POP_PARTICLE_SPEED = 3;
+
+        const toyDefinitions = [
+            { id: 'bear', emoji: '🧸', isRocket: false, movementType: 'bounce' },
+            { id: 'ball', emoji: '⚽️', isRocket: false, movementType: 'bounce' },
+            { id: 'rocket', emoji: '🚀', isRocket: true, movementType: 'bounce' },
+            { id: 'car', emoji: '🚗', isRocket: false, movementType: 'bounce' },
+            { id: 'balloon', emoji: '🎈', isRocket: false, movementType: 'float_gentle' },
+            { id: 'star', emoji: '🌟', isRocket: false, movementType: 'float_drift', particleEffect: 'trail' },
+        ];
+
+        let activeLaunchedToys = [];
+        let activePopParticles = []; // For managing pop explosion particles
+        let floorBoundaryY; 
+
+        function updateFloorBoundary() {
+            if (toyBar) {
+                floorBoundaryY = window.innerHeight - toyBar.offsetHeight;
+            } else {
+                floorBoundaryY = window.innerHeight; 
+            }
+        }
+
+        function initToyBar() {
+            toyDefinitions.forEach(toyDef => {
+                const toyElement = document.createElement('div');
+                toyElement.id = `bar-${toyDef.id}`;
+                toyElement.textContent = toyDef.emoji;
+                toyElement.className = 'text-5xl sm:text-6xl cursor-pointer emoji-toy p-2 select-none';
+                toyElement.setAttribute('role', 'button');
+                toyElement.setAttribute('aria-label', `Launch ${toyDef.id}`);
+
+                const launchHandler = (e) => {
+                    e.preventDefault(); 
+                    handleToyTap(toyDef, toyElement);
+                };
+                toyElement.addEventListener('touchstart', launchHandler);
+                toyElement.addEventListener('click', launchHandler); // Keep click for mouse fallback
+                toyBar.appendChild(toyElement);
+            });
+        }
+
+        function handleToyTap(toyDef, originalBarElement) {
+            if (toyDef.isRocket) {
+                showCountdown(() => {
+                    createAndLaunchToy(toyDef, originalBarElement, true);
+                });
+            } else {
+                createAndLaunchToy(toyDef, originalBarElement, false);
+            }
+        }
+
+        function showCountdown(callbackOnFinish) {
+            countdownDisplay.classList.remove('hidden');
+            let count = 3;
+            countdownText.textContent = count;
+            const interval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    countdownText.textContent = count;
+                } else if (count === 0) {
+                    countdownText.textContent = 'GO!';
+                } else {
+                    clearInterval(interval);
+                    countdownDisplay.classList.add('hidden');
+                    if (callbackOnFinish) callbackOnFinish();
+                }
+            }, 800);
+        }
+
+        function createAndLaunchToy(toyDef, originalBarElement, isRocketLaunch) {
+            const originalRect = originalBarElement.getBoundingClientRect();
+            const launchedToyElement = document.createElement('div');
+            launchedToyElement.textContent = toyDef.emoji;
+            launchedToyElement.className = 'absolute text-5xl sm:text-6xl z-20 launched-toy select-none'; 
+            gameArea.appendChild(launchedToyElement);
+
+            const toyWidth = launchedToyElement.offsetWidth;
+            const toyHeight = launchedToyElement.offsetHeight;
+            
+            let startX = originalRect.left + (originalRect.width / 2) - (toyWidth / 2);
+            let startY = originalRect.top + (originalRect.height / 2) - (toyHeight / 2);
+
+            if (startY + toyHeight > floorBoundaryY) {
+                startY = floorBoundaryY - toyHeight - 10; 
+            }
+
+            launchedToyElement.style.left = `${startX}px`;
+            launchedToyElement.style.top = `${startY}px`;
+
+            let toyVx, toyVy;
+
+            if (toyDef.movementType === 'float_gentle') {
+                toyVx = (Math.random() - 0.5) * 1.2; 
+                toyVy = -0.3 - Math.random() * 0.4; 
+            } else if (toyDef.movementType === 'float_drift') {
+                toyVx = (Math.random() - 0.5) * 1.5; 
+                toyVy = (Math.random() - 0.5) * 1.5;
+            } else { 
+                toyVx = (Math.random() - 0.5) * HORIZONTAL_KICK_RANGE * 2;
+                toyVy = isRocketLaunch ? ROCKET_LAUNCH_VY : INITIAL_KICK_VY;
+            }
+
+            const newToyData = {
+                element: launchedToyElement,
+                x: startX, y: startY,
+                vx: toyVx, vy: toyVy,
+                width: toyWidth, height: toyHeight,
+                isRocket: toyDef.isRocket,
+                movementType: toyDef.movementType,
+                particleEffect: toyDef.particleEffect,
+                particles: toyDef.particleEffect === 'trail' ? [] : undefined,
+                particleTimer: toyDef.particleEffect === 'trail' ? 0 : undefined,
+            };
+            activeLaunchedToys.push(newToyData);
+
+            // Add event listener for popping this specific launched toy
+            const popHandler = (e) => {
+                e.preventDefault(); // Important for touchstart
+                popToy(newToyData);
+            };
+            launchedToyElement.addEventListener('touchstart', popHandler);
+            launchedToyElement.addEventListener('click', popHandler); // Keep click for mouse fallback
+        }
+
+        function popToy(toyToPop) {
+            // 1. Remove toy element from DOM
+            if (toyToPop.element.parentNode === gameArea) {
+                gameArea.removeChild(toyToPop.element);
+            }
+
+            // 2. If it's a star, remove its existing trail particles
+            if (toyToPop.particleEffect === 'trail' && toyToPop.particles) {
+                toyToPop.particles.forEach(p => {
+                    if (p.element.parentNode === gameArea) {
+                        gameArea.removeChild(p.element);
+                    }
+                });
+                toyToPop.particles = []; // Clear the array
+            }
+
+            // 3. Create pop particle explosion
+            createPopExplosion(toyToPop.x, toyToPop.y, toyToPop.width, toyToPop.height);
+
+            // 4. Play sound (user needs to provide pop1.mp3)
+            try {
+                const audio = new Audio('pop1.mp3'); // Ensure pop1.mp3 is in the same directory or provide correct path
+                const playPromise = audio.play();
+
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        // Autoplay was prevented or other error.
+                        console.warn("Audio play failed:", error);
+                        // You could add a visual cue here if sound is critical and fails
+                    });
+                }
+            } catch (e) {
+                // This catch is for errors during `new Audio()` itself, though less common for this error type.
+                console.warn("Could not initialize or play pop sound. Ensure pop1.mp3 is available and in a supported format.", e);
+            }
+
+            // 5. Remove toy from active list
+            const index = activeLaunchedToys.indexOf(toyToPop);
+            if (index > -1) {
+                activeLaunchedToys.splice(index, 1);
+            }
+        }
+
+        function createPopExplosion(x, y, width, height) {
+            const centerX = x + width / 2;
+            const centerY = y + height / 2;
+            const colors = ['#FF5733', '#FFC300', '#DAF7A6', '#7DCEA0', '#5DADE2', '#C39BD3'];
+
+            for (let i = 0; i < POP_PARTICLE_COUNT; i++) {
+                const particleEl = document.createElement('div');
+                particleEl.className = 'pop-particle';
+                
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * POP_PARTICLE_SPEED + 1;
+                const size = Math.random() * 6 + 4; // 4px to 10px
+
+                particleEl.style.width = `${size}px`;
+                particleEl.style.height = `${size}px`;
+                particleEl.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                particleEl.style.left = `${centerX - size / 2}px`;
+                particleEl.style.top = `${centerY - size / 2}px`;
+                particleEl.style.opacity = '1';
+
+                gameArea.appendChild(particleEl);
+                activePopParticles.push({
+                    element: particleEl,
+                    x: centerX - size / 2,
+                    y: centerY - size / 2,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: POP_PARTICLE_LIFESPAN,
+                    initialOpacity: 1,
+                });
+            }
+        }
+
+        function createStarParticle(starToy) {
+            const particleEl = document.createElement('div');
+            particleEl.className = 'particle'; 
+            const size = Math.random() * 4 + 3; 
+            particleEl.style.width = `${size}px`;
+            particleEl.style.height = `${size}px`;
+            particleEl.style.backgroundColor = `rgba(255, 215, 0, ${0.6 + Math.random() * 0.3})`; 
+            particleEl.style.boxShadow = `0 0 ${Math.random()*3 + 2}px rgba(255, 223, 100, 0.7)`;
+
+            const pData = {
+                element: particleEl,
+                x: starToy.x + starToy.width / 2 - size / 2 + (Math.random() - 0.5) * starToy.width * 0.3,
+                y: starToy.y + starToy.height / 2 - size / 2 + (Math.random() - 0.5) * starToy.height * 0.3,
+                vx: (Math.random() - 0.5) * 0.6, 
+                vy: (Math.random() - 0.5) * 0.6,
+                life: PARTICLE_LIFESPAN + Math.random() * 20, 
+                initialOpacity: parseFloat(particleEl.style.backgroundColor.split(',')[3]) || 0.8 
+            };
+            particleEl.style.left = `${pData.x}px`;
+            particleEl.style.top = `${pData.y}px`;
+            particleEl.style.opacity = pData.initialOpacity;
+
+            gameArea.appendChild(particleEl);
+            starToy.particles.push(pData);
+        }
+
+        function updateStarParticles(starToy) {
+            starToy.particleTimer = (starToy.particleTimer || 0) + 1;
+            if (starToy.particles.length < MAX_PARTICLES_PER_STAR && starToy.particleTimer % PARTICLE_SPAWN_INTERVAL === 0) {
+                createStarParticle(starToy);
+            }
+            for (let i = starToy.particles.length - 1; i >= 0; i--) {
+                const p = starToy.particles[i];
+                p.life--;
+                p.x += p.vx;
+                p.y += p.vy;
+                const currentOpacity = (p.life / (PARTICLE_LIFESPAN + 20)) * p.initialOpacity;
+                p.element.style.opacity = Math.max(0, currentOpacity);
+                if (p.life <= 0 || currentOpacity <= 0) {
+                    if (p.element.parentNode === gameArea) {
+                         gameArea.removeChild(p.element);
+                    }
+                    starToy.particles.splice(i, 1);
+                } else {
+                    p.element.style.left = `${p.x}px`;
+                    p.element.style.top = `${p.y}px`;
+                }
+            }
+        }
+
+        function gameLoop() {
+            const gameAreaWidth = window.innerWidth;
+
+            // Update active launched toys
+            activeLaunchedToys.forEach(toy => {
+                if (toy.movementType === 'bounce') {
+                    toy.vy += GRAVITY;
+                    toy.x += toy.vx;
+                    toy.y += toy.vy;
+                    if (toy.x < 0) { toy.x = 0; toy.vx *= -BOUNCE_DAMPING; }
+                    if (toy.x + toy.width > gameAreaWidth) { toy.x = gameAreaWidth - toy.width; toy.vx *= -BOUNCE_DAMPING; }
+                    if (toy.y < 0) { toy.y = 0; toy.vy *= -BOUNCE_DAMPING; }
+                    if (toy.y + toy.height > floorBoundaryY) {
+                        toy.y = floorBoundaryY - toy.height;
+                        toy.vy *= -BOUNCE_DAMPING;
+                        toy.vx *= 0.98; 
+                        if (Math.abs(toy.vy) < GRAVITY * 1.5) toy.vy = 0; 
+                    }
+                } else if (toy.movementType === 'float_gentle') { 
+                    toy.vx += (Math.random() - 0.5) * 0.08;
+                    toy.vy += (Math.random() - 0.5) * 0.03 - 0.005; 
+                    toy.vx = Math.max(-1, Math.min(1, toy.vx));
+                    toy.vy = Math.max(-0.8, Math.min(0.2, toy.vy)); 
+                    toy.x += toy.vx;
+                    toy.y += toy.vy;
+                    if (toy.x < 0 && toy.vx < 0) { toy.vx *= -0.8; toy.x = 0;}
+                    if (toy.x + toy.width > gameAreaWidth && toy.vx > 0) { toy.vx *= -0.8; toy.x = gameAreaWidth - toy.width; }
+                    if (toy.y < 0 && toy.vy < 0) { toy.vy *= -0.8; toy.y = 0; }
+                    if (toy.y + toy.height > floorBoundaryY && toy.vy > 0) { toy.vy *= -0.8; toy.y = floorBoundaryY - toy.height; }
+                } else if (toy.movementType === 'float_drift') { 
+                    if (Math.random() < 0.015) toy.vx = (Math.random() - 0.5) * 2; 
+                    if (Math.random() < 0.015) toy.vy = (Math.random() - 0.5) * 2; 
+                    toy.vx = Math.max(-1.5, Math.min(1.5, toy.vx));
+                    toy.vy = Math.max(-1.5, Math.min(1.5, toy.vy));
+                    toy.x += toy.vx;
+                    toy.y += toy.vy;
+                    if (toy.x < 0 && toy.vx < 0) { toy.vx *= -1; toy.x = 0; }
+                    if (toy.x + toy.width > gameAreaWidth && toy.vx > 0) { toy.vx *= -1; toy.x = gameAreaWidth - toy.width; }
+                    if (toy.y < 0 && toy.vy < 0) { toy.vy *= -1; toy.y = 0; }
+                    if (toy.y + toy.height > floorBoundaryY && toy.vy > 0) { toy.vy *= -1; toy.y = floorBoundaryY - toy.height; }
+                    if (toy.particleEffect === 'trail') {
+                        updateStarParticles(toy);
+                    }
+                }
+                toy.element.style.left = `${toy.x}px`;
+                toy.element.style.top = `${toy.y}px`;
+            });
+
+            // Update pop particles
+            for (let i = activePopParticles.length - 1; i >= 0; i--) {
+                const p = activePopParticles[i];
+                p.life--;
+                p.x += p.vx;
+                p.y += p.vy;
+                // Apply a little gravity to pop particles for a nice arc
+                p.vy += GRAVITY * 0.1; 
+
+                const currentOpacity = (p.life / POP_PARTICLE_LIFESPAN) * p.initialOpacity;
+                p.element.style.opacity = Math.max(0, currentOpacity);
+
+                if (p.life <= 0 || currentOpacity <= 0) {
+                    if (p.element.parentNode === gameArea) {
+                        gameArea.removeChild(p.element);
+                    }
+                    activePopParticles.splice(i, 1);
+                } else {
+                    p.element.style.left = `${p.x}px`;
+                    p.element.style.top = `${p.y}px`;
+                }
+            }
+            requestAnimationFrame(gameLoop);
+        }
+
+        initToyBar();
+        updateFloorBoundary(); 
+        requestAnimationFrame(gameLoop);
+
+        window.addEventListener('resize', () => {
+            updateFloorBoundary(); 
+        });
+    </script>
+</body>
+</html>
