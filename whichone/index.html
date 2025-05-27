@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Emoji Match Game</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <style>
+        /* Basic Reset and Global Styles */
+        body, html {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Prevent scrollbars */
+            font-family: 'Inter', Arial, sans-serif;
+            background-color: #f0f8ff; /* Light AliceBlue background */
+            -webkit-tap-highlight-color: transparent; /* Disable tap highlight on mobile */
+        }
+
+        /* Game Container: Full viewport, flex column */
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+            user-select: none; /* Prevent text selection */
+            -webkit-user-select: none; /* Safari */
+            -moz-user-select: none; /* Firefox */
+            -ms-user-select: none; /* IE */
+        }
+
+        /* Word Area: Top 25% of screen */
+        #word-container {
+            height: 25vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #87CEEB; /* Sky Blue */
+            border-bottom: 5px solid #4682B4; /* Steel Blue border */
+            box-sizing: border-box;
+        }
+
+        #word-text {
+            font-size: clamp(6vh, 10vw, 12vh); /* Responsive font size */
+            font-weight: 700; /* Bolder */
+            color: #ffffff; /* White text */
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2); /* Subtle shadow for depth */
+            padding: 0 2vw; /* Padding for very long words */
+        }
+
+        /* Emojis Area: Bottom 75% of screen, flex row */
+        #emojis-container {
+            height: 75vh;
+            display: flex;
+            justify-content: space-around; /* Space out emoji options */
+            align-items: center; /* Vertically center emojis */
+            padding: 2vh; /* Padding around emoji options */
+            box-sizing: border-box;
+            gap: 2vw; /* Gap between emoji options */
+        }
+
+        /* Emoji Option: Clickable area for each emoji */
+        .emoji-option {
+            flex: 1; /* Each option takes equal width */
+            height: calc(100% - 4vh); /* Fill most of the container height */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 30vh; /* Large emoji character, approx 30% of viewport height */
+            cursor: pointer;
+            background-color: #ffffff; /* White background */
+            border-radius: 25px; /* Rounded corners */
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15); /* Softer shadow */
+            transition: transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+            overflow: hidden; /* Ensure emoji doesn't spill out */
+            text-align: center;
+        }
+
+        .emoji-option:active { /* Visual feedback on tap */
+            transform: scale(0.95);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Shake animation for incorrect answer */
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translateX(-2px); }
+            20%, 80% { transform: translateX(4px); }
+            30%, 50%, 70% { transform: translateX(-6px); }
+            40%, 60% { transform: translateX(6px); }
+        }
+
+        /* Fullscreen Button */
+        #fullscreen-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            font-size: 18px;
+            font-weight: 600;
+            color: white;
+            background-color: #5cb85c; /* Green */
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            z-index: 1000; /* Ensure it's on top */
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: background-color 0.2s;
+        }
+
+        #fullscreen-btn:hover {
+            background-color: #4cae4c; /* Darker green */
+        }
+         /* Error Modal Styles */
+        #error-modal {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 25px;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            z-index: 2000;
+            text-align: center;
+            max-width: 80%;
+        }
+        #error-modal p {
+            margin-bottom: 20px;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+        #error-modal button {
+            padding: 10px 20px;
+            background-color: #5cb85c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #error-modal button:hover {
+            background-color: #4cae4c;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="word-container">
+            <span id="word-text">WORD</span>
+        </div>
+        <div id="emojis-container">
+            <div class="emoji-option" id="emoji-option-1" data-emoji=""></div>
+            <div class="emoji-option" id="emoji-option-2" data-emoji=""></div>
+        </div>
+    </div>
+    <button id="fullscreen-btn">Full Screen</button>
+
+    <script>
+        // Game Data: Word, Correct Emoji, Distractor Emoji
+        const gameData = [
+            { word: "Rabbit", correctEmoji: "🐰", distractorEmoji: "🐯" },
+            { word: "Cat", correctEmoji: "🐱", distractorEmoji: "🐶" },
+            { word: "Dog", correctEmoji: "🐶", distractorEmoji: "🐰" },
+            { word: "Cow", correctEmoji: "🐮", distractorEmoji: "🐷" },
+            { word: "Pig", correctEmoji: "🐷", distractorEmoji: "🐵" },
+            { word: "Monkey", correctEmoji: "🐵", distractorEmoji: "🐸" },
+            { word: "Frog", correctEmoji: "🐸", distractorEmoji: "🐥" },
+            { word: "Duck", correctEmoji: "🦆", distractorEmoji: "🐝" },
+            { word: "Bee", correctEmoji: "🐝", distractorEmoji: "🦋" },
+            { word: "Butterfly", correctEmoji: "🦋", distractorEmoji: "🐞" },
+            { word: "Ladybug", correctEmoji: "🐞", distractorEmoji: "🕷️" },
+            { word: "Spider", correctEmoji: "🕷️", distractorEmoji: "🐌" },
+            { word: "Snail", correctEmoji: "🐌", distractorEmoji: "🐢" },
+            { word: "Turtle", correctEmoji: "🐢", distractorEmoji: "🐳" },
+            { word: "Fish", correctEmoji: "🐟", distractorEmoji: "🐠" },
+            { word: "Bird", correctEmoji: "🐦", distractorEmoji: "🦇" },
+            { word: "Bear", correctEmoji: "🐻", distractorEmoji: "🐨" },
+            { word: "Lion", correctEmoji: "🦁", distractorEmoji: "🐯" },
+            { word: "Tiger", correctEmoji: "🐯", distractorEmoji: "🐴" },
+            { word: "Horse", correctEmoji: "🐴", distractorEmoji: "🦄" },
+            { word: "Sheep", correctEmoji: "🐑", distractorEmoji: "🐐" },
+            { word: "Goat", correctEmoji: "🐐", distractorEmoji: "🐄" },
+            { word: "Elephant", correctEmoji: "🐘", distractorEmoji: "🦏" },
+            { word: "Rhino", correctEmoji: "🦏", distractorEmoji: "🦛" },
+            { word: "Hippo", correctEmoji: "🦛", distractorEmoji: "🦒" },
+            { word: "Giraffe", correctEmoji: "🦒", distractorEmoji: "🦓" },
+            { word: "Zebra", correctEmoji: "🦓", distractorEmoji: "🐆" },
+            { word: "Chicken", correctEmoji: "🐔", distractorEmoji: "🐤" },
+            { word: "Chick", correctEmoji: "🐥", distractorEmoji: "🦅" },
+            { word: "Eagle", correctEmoji: "🦅", distractorEmoji: "🦉" },
+            { word: "Owl", correctEmoji: "🦉", distractorEmoji: "🦇" },
+            { word: "Bat", correctEmoji: "🦇", distractorEmoji: "🐺" },
+            { word: "Wolf", correctEmoji: "🐺", distractorEmoji: "🦊" },
+            { word: "Fox", correctEmoji: "🦊", distractorEmoji: "🦝" },
+            { word: "Panda", correctEmoji: "🐼", distractorEmoji: "🐻" },
+            { word: "Koala", correctEmoji: "🐨", distractorEmoji: "🐹" },
+            { word: "Hamster", correctEmoji: "🐹", distractorEmoji: "🐰" },
+            { word: "Mouse", correctEmoji: "🐭", distractorEmoji: "🐬" },
+            { word: "Squirrel", correctEmoji: "🐿️", distractorEmoji: "🐇" },
+            { word: "Whale", correctEmoji: "🐳", distractorEmoji: "🐬" },
+            { word: "Dolphin", correctEmoji: "🐬", distractorEmoji: "🐠" },
+            { word: "Crab", correctEmoji: "🦀", distractorEmoji: "🐙" },
+            { word: "Octopus", correctEmoji: "🐙", distractorEmoji: "🐠" },
+            { word: "Penguin", correctEmoji: "🐧", distractorEmoji: "🐦" },
+            { word: "Seal", correctEmoji: "🦭", distractorEmoji: "🐋" },
+            { word: "Parrot", correctEmoji: "🦜", distractorEmoji: "🐥" },
+            { word: "Camel", correctEmoji: "🐫", distractorEmoji: "🐥" },
+            { word: "Llama", correctEmoji: "🦙", distractorEmoji: "🐐" },
+            { word: "Snake", correctEmoji: "🐍", distractorEmoji: "🦎" },
+            { word: "Lizard", correctEmoji: "🦎", distractorEmoji: "🐢" }
+        ];
+
+        // DOM Elements
+        const wordTextElement = document.getElementById('word-text');
+        const emojiOption1 = document.getElementById('emoji-option-1');
+        const emojiOption2 = document.getElementById('emoji-option-2');
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+
+        // Game State
+        let currentRoundData = null;
+        let shuffledGameData = [...gameData]; // Create a mutable copy
+        let currentWordIndex = -1;
+        let gameActive = true; // Start true, will be managed by logic
+
+        // Fisher-Yates Shuffle Algorithm
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        // Confetti Function
+        function blastConfetti() {
+            const count = 200; 
+            const defaults = {
+                origin: { y: 0.6 }, 
+                spread: 180, 
+                ticks: 100, 
+                gravity: 0.8,
+                decay: 0.94,
+                startVelocity: 30,
+                scalar: 1
+            };
+
+            function fire(particleRatio, opts) {
+                confetti(Object.assign({}, defaults, opts, {
+                    particleCount: Math.floor(count * particleRatio)
+                }));
+            }
+
+            fire(0.25, { spread: 26, startVelocity: 55 });
+            fire(0.2, { spread: 60 });
+            fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+            fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+            fire(0.1, { spread: 120, startVelocity: 45 });
+        }
+        
+        // Load Next Round
+        function nextRound() {
+            currentWordIndex++;
+            if (currentWordIndex >= shuffledGameData.length) {
+                currentWordIndex = 0; 
+                shuffleArray(shuffledGameData); 
+            }
+
+            currentRoundData = shuffledGameData[currentWordIndex];
+            wordTextElement.textContent = currentRoundData.word;
+
+            const emojis = [currentRoundData.correctEmoji, currentRoundData.distractorEmoji];
+            if (Math.random() < 0.5) {
+                emojiOption1.textContent = emojis[0];
+                emojiOption1.dataset.emoji = emojis[0];
+                emojiOption2.textContent = emojis[1];
+                emojiOption2.dataset.emoji = emojis[1];
+            } else {
+                emojiOption1.textContent = emojis[1];
+                emojiOption1.dataset.emoji = emojis[1];
+                emojiOption2.textContent = emojis[0];
+                emojiOption2.dataset.emoji = emojis[0];
+            }
+            
+            // Re-enable interactions after a very brief pause for UI to update
+            setTimeout(() => {
+                gameActive = true;
+            }, 50); // Short delay ensures rendering before next interaction
+        }
+
+        // Handle Emoji Click
+        function handleEmojiClick(event) {
+            if (!gameActive || !currentRoundData || !event.target.classList.contains('emoji-option')) {
+                return;
+            }
+            
+            gameActive = false; // Disable clicks immediately to prevent multiple submissions
+
+            const clickedElement = event.target;
+            const selectedEmoji = clickedElement.dataset.emoji;
+
+            if (selectedEmoji === currentRoundData.correctEmoji) {
+                blastConfetti();
+                // Proceed to next round after a brief delay for confetti to start
+                setTimeout(nextRound, 100); // nextRound will re-enable gameActive
+            } else {
+                clickedElement.classList.add('shake');
+                // Re-enable clicks after shake animation for incorrect answer
+                setTimeout(() => {
+                    clickedElement.classList.remove('shake');
+                    gameActive = true; 
+                }, 600); 
+            }
+        }
+
+        // Attach Event Listeners
+        emojiOption1.addEventListener('click', handleEmojiClick);
+        emojiOption2.addEventListener('click', handleEmojiClick);
+
+        // Fullscreen Functionality
+        fullscreenBtn.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen()
+                    .catch(err => {
+                        const existingModal = document.getElementById('error-modal');
+                        if (existingModal) {
+                            existingModal.remove();
+                        }
+
+                        const modal = document.createElement('div');
+                        modal.id = 'error-modal';
+                        
+                        const message = document.createElement('p');
+                        message.textContent = `Could not enter full-screen mode: ${err.message}. This might require direct user interaction (like a click) or your browser settings might prevent it.`;
+                        
+                        const closeButton = document.createElement('button');
+                        closeButton.textContent = 'OK';
+                        closeButton.onclick = () => {
+                            modal.remove();
+                        };
+
+                        modal.appendChild(message);
+                        modal.appendChild(closeButton);
+                        document.body.appendChild(modal);
+                    });
+            }
+        });
+
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                fullscreenBtn.style.display = 'none';
+            } else {
+                fullscreenBtn.style.display = 'block';
+            }
+        });
+
+        // Initialize Game on Load
+        document.addEventListener('DOMContentLoaded', () => {
+            gameActive = false; // Set inactive until first round is fully loaded
+            shuffleArray(shuffledGameData); 
+            nextRound(); // Load the first round; nextRound will set gameActive to true
+        });
+    </script>
+</body>
+</html>
