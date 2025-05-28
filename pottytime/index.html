@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Potty Training Fun!</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden; /* Prevent scrollbars */
+            background-color: #f0f8ff; /* Light sky blue, or any toddler-friendly color */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif; /* Fallback font */
+            touch-action: none; /* Important for touch interactions on tablets */
+        }
+        #game-area {
+            width: 100%;
+            height: 100%;
+            position: relative; /* Crucial for absolute positioning of game elements */
+            cursor: default; /* Default cursor for the game area */
+        }
+        .game-object {
+            position: absolute;
+            font-size: 192px; /* Original 48px * 4 = 192px */
+            user-select: none; /* Prevent text selection during drag */
+            -webkit-user-select: none; /* Safari */
+            -moz-user-select: none;    /* Firefox */
+            -ms-user-select: none;     /* IE10+ */
+            line-height: 1; /* Ensure consistent height for emojis */
+        }
+        #baby {
+            cursor: grab;
+        }
+        .poo {
+            /* Poo is not draggable, inherits default cursor from game-area */
+        }
+        #score-display { /* Optional: if you want to display a score or messages */
+            position: absolute;
+            top: 20px; /* Increased spacing for larger layout */
+            left: 20px;
+            font-size: 32px; /* Slightly larger score display */
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-area">
+        <div id="baby" class="game-object">👶</div>
+        <div id="toilet" class="game-object">🚽</div>
+        </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const gameArea = document.getElementById('game-area');
+            const babyElement = document.getElementById('baby');
+            const toiletElement = document.getElementById('toilet');
+            // const scoreDisplay = document.getElementById('score-display'); // Optional
+
+            let baby = { x: 0, y: 0, element: babyElement, isDragging: false, offsetX: 0, offsetY: 0, width: 0, height: 0 };
+            let toilet = { x: 0, y: 0, element: toiletElement, width: 0, height: 0 };
+            let poos = []; // Array to hold active poo objects
+            let pooSpawnInterval;
+            let gameActive = true;
+            // let currentLevel = 1; // Optional
+
+            const POO_SPAWN_RATE = 5000; // 5 seconds
+            const POO_FALL_SPEED = 3.5; // Pixels per frame, adjust for desired speed with larger items
+
+            function getElementDimensions(element) {
+                const rect = element.getBoundingClientRect();
+                // Ensure width/height are non-zero, useful if called before full render of large emojis
+                return {
+                    width: rect.width || parseFloat(window.getComputedStyle(element).fontSize),
+                    height: rect.height || parseFloat(window.getComputedStyle(element).fontSize)
+                };
+            }
+
+            // --- UTILITY FUNCTIONS ---
+            function getRandomPosition(elementWidth, elementHeight, inBottomHalf = false) {
+                const gameRect = gameArea.getBoundingClientRect();
+                const x = Math.random() * (gameRect.width - elementWidth);
+                let y;
+                if (inBottomHalf) {
+                    // Spawn in bottom half: (middle_point) + (random_offset_within_bottom_half)
+                    const halfHeight = gameRect.height / 2;
+                    y = halfHeight + (Math.random() * (halfHeight - elementHeight));
+                } else {
+                    y = Math.random() * (gameRect.height - elementHeight);
+                }
+                // Ensure y is not less than 0, especially if elementHeight is large
+                y = Math.max(0, y);
+                // Ensure y does not cause element to go off bottom screen
+                y = Math.min(y, gameRect.height - elementHeight);
+
+                return { x, y };
+            }
+
+            function setPosition(gameObject, x, y) {
+                gameObject.x = x;
+                gameObject.y = y;
+                gameObject.element.style.left = `${x}px`;
+                gameObject.element.style.top = `${y}px`;
+            }
+
+            function isColliding(rect1, rect2) {
+                if (!rect1 || !rect2 || rect1.width === 0 || rect1.height === 0 || rect2.width === 0 || rect2.height === 0) {
+                    return false;
+                }
+                // Add a small tolerance for larger emojis if pixel-perfect isn't needed
+                // const tolerance = 5; // Example tolerance in pixels
+                return !(
+                    rect1.right  < rect2.left  || // + tolerance
+                    rect1.left   > rect2.right || // - tolerance
+                    rect1.bottom < rect2.top   || // + tolerance
+                    rect1.top    > rect2.bottom   // - tolerance
+                );
+            }
+
+            // --- GAME SETUP ---
+            function setupLevel() {
+                gameActive = true;
+                poos.forEach(p => p.element.remove());
+                poos = [];
+
+                const babyDims = getElementDimensions(baby.element);
+                baby.width = babyDims.width;
+                baby.height = babyDims.height;
+
+                const toiletDims = getElementDimensions(toilet.element);
+                toilet.width = toiletDims.width;
+                toilet.height = toiletDims.height;
+
+                const babyPos = getRandomPosition(baby.width, baby.height, false); // Baby can be anywhere
+                setPosition(baby, babyPos.x, babyPos.y);
+
+                let toiletPos;
+                do {
+                    // Ensure toilet spawns in the bottom half and not too close to the baby
+                    toiletPos = getRandomPosition(toilet.width, toilet.height, true); // true for inBottomHalf
+                } while (
+                    Math.sqrt(
+                        Math.pow(babyPos.x + baby.width / 2 - (toiletPos.x + toilet.width / 2), 2) +
+                        Math.pow(babyPos.y + baby.height / 2 - (toiletPos.y + toilet.height / 2), 2)
+                    ) < (baby.width + toilet.width) * 0.8 // Check distance between centers, adjusted factor for larger items
+                );
+                setPosition(toilet, toiletPos.x, toiletPos.y);
+
+                // if (scoreDisplay) scoreDisplay.textContent = `Level: ${currentLevel}`;
+
+                if (pooSpawnInterval) clearInterval(pooSpawnInterval);
+                pooSpawnInterval = setInterval(spawnPoo, POO_SPAWN_RATE);
+
+                if (!gameLoopId) gameLoop();
+            }
+
+            // --- BABY DRAGGING ---
+            function startDrag(event) {
+                if (!gameActive) return;
+                event.preventDefault();
+                baby.isDragging = true;
+                baby.element.style.cursor = 'grabbing';
+                const touch = event.type === 'touchstart' ? event.touches[0] : event;
+                const babyRect = baby.element.getBoundingClientRect();
+                baby.offsetX = touch.clientX - babyRect.left;
+                baby.offsetY = touch.clientY - babyRect.top;
+            }
+
+            function drag(event) {
+                if (!baby.isDragging || !gameActive) return;
+                event.preventDefault();
+                const touch = event.type === 'touchmove' ? event.touches[0] : event;
+                const gameRect = gameArea.getBoundingClientRect();
+
+                let newX = touch.clientX - gameRect.left - baby.offsetX;
+                let newY = touch.clientY - gameRect.top - baby.offsetY;
+
+                newX = Math.max(0, Math.min(newX, gameRect.width - baby.width));
+                newY = Math.max(0, Math.min(newY, gameRect.height - baby.height));
+
+                setPosition(baby, newX, newY);
+            }
+
+            function endDrag() {
+                if (!baby.isDragging) return;
+                baby.isDragging = false;
+                baby.element.style.cursor = 'grab';
+            }
+
+            baby.element.addEventListener('mousedown', startDrag);
+            baby.element.addEventListener('touchstart', startDrag, { passive: false });
+            gameArea.addEventListener('mousemove', drag);
+            gameArea.addEventListener('touchmove', drag, { passive: false });
+            window.addEventListener('mouseup', endDrag);
+            window.addEventListener('touchend', endDrag);
+
+            // --- POO MECHANICS ---
+            function spawnPoo() {
+                if (!gameActive) return;
+
+                const pooElement = document.createElement('div');
+                pooElement.textContent = '💩';
+                pooElement.classList.add('game-object', 'poo');
+                pooElement.style.opacity = '0';
+                gameArea.appendChild(pooElement);
+
+                const pooDims = getElementDimensions(pooElement);
+
+                // Spawn poo slightly below the center of the baby's width, and near baby's visual bottom
+                const initialX = baby.x + (baby.width / 2) - (pooDims.width / 2);
+                const initialY = baby.y + baby.height * 0.65; // Adjusted for larger baby, poo appears lower
+
+                const newPoo = {
+                    x: initialX, y: initialY, element: pooElement,
+                    width: pooDims.width, height: pooDims.height
+                };
+                setPosition(newPoo, initialX, initialY);
+                poos.push(newPoo);
+
+                requestAnimationFrame(() => {
+                    pooElement.style.transition = 'opacity 0.3s ease-in';
+                    pooElement.style.opacity = '1';
+                });
+            }
+
+            function updatePoos() {
+                if (!gameActive) return;
+
+                const gameRect = gameArea.getBoundingClientRect();
+                const toiletRect = toilet.element.getBoundingClientRect();
+
+                for (let i = poos.length - 1; i >= 0; i--) {
+                    const poo = poos[i];
+                    poo.y += POO_FALL_SPEED;
+                    poo.element.style.top = `${poo.y}px`;
+
+                    const pooRect = poo.element.getBoundingClientRect();
+
+                    if (isColliding(pooRect, toiletRect)) {
+                        gameActive = false;
+                        triggerPooConfetti(pooRect.left + pooRect.width / 2, pooRect.top + pooRect.height / 2);
+
+                        poo.element.style.transition = 'transform 0.2s ease-out, opacity 0.2s ease-out';
+                        poo.element.style.transform = 'scale(1.5)';
+                        poo.element.style.opacity = '0';
+
+                        setTimeout(() => {
+                            poo.element.remove();
+                            handleSuccess();
+                        }, 200);
+
+                        poos.splice(i, 1);
+                        return;
+                    }
+
+                    if (pooRect.top > gameRect.height) { // Use top instead of bottom for large items off screen
+                        poo.element.remove();
+                        poos.splice(i, 1);
+                    }
+                }
+            }
+
+            // --- SUCCESS AND RESET ---
+            function triggerPooConfetti(x, y) {
+                if (typeof confetti !== 'function') return;
+                const gameRect = gameArea.getBoundingClientRect();
+                const originX = (x - gameRect.left) / gameRect.width;
+                const originY = (y - gameRect.top) / gameRect.height;
+
+                confetti({
+                    particleCount: 70, // More confetti for larger success
+                    spread: 90,
+                    origin: { x: originX, y: originY },
+                    scalar: 0.8, // Larger individual confetti pieces
+                    decay: 0.92,
+                    gravity: 1.5,
+                    ticks: 150, // Slightly longer
+                    zIndex: 1000
+                });
+            }
+
+            function triggerScreenConfetti() {
+                if (typeof confetti !== 'function') return;
+                confetti({
+                    particleCount: 200, // More!
+                    spread: 180,
+                    origin: { x: 0.5, y: 0.5 }, // More central origin
+                    angle: 90,
+                    startVelocity: 40, // Higher
+                    gravity: 0.6,
+                    ticks: 350, // Longer duration
+                    scalar: 1.2, // Larger pieces
+                    zIndex: 1000
+                });
+            }
+
+            function handleSuccess() {
+                triggerScreenConfetti();
+                clearInterval(pooSpawnInterval);
+                // currentLevel++;
+                setTimeout(() => {
+                    setupLevel();
+                }, 3500); // Slightly longer delay for bigger celebration
+            }
+
+            // --- GAME LOOP ---
+            let gameLoopId;
+            function gameLoop() {
+                if (gameActive) {
+                    updatePoos();
+                }
+                gameLoopId = requestAnimationFrame(gameLoop);
+            }
+
+            // --- INITIALIZE ---
+            setTimeout(() => {
+                setupLevel();
+            }, 150); // Slightly longer delay for larger emojis to ensure dimensions are ready
+
+            // --- RESIZE HANDLING ---
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                if (pooSpawnInterval) clearInterval(pooSpawnInterval);
+                poos.forEach(p => p.element.remove());
+                poos = [];
+                if (gameLoopId) cancelAnimationFrame(gameLoopId);
+                gameLoopId = null;
+                gameActive = false;
+
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    setTimeout(setupLevel, 100); // Delay setup after resize to let things settle
+                }, 300);
+            });
+        });
+    </script>
+</body>
+</html>
