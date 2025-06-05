@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kids Games</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f2f2f2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            margin-top: 40px;
+            color: #333;
+        }
+        .games {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            padding: 20px;
+            width: 100%;
+            max-width: 1200px;
+        }
+        .game-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 250px;
+            height: 120px;
+            margin: 10px;
+            font-size: 1.5rem;
+            text-decoration: none;
+            color: #fff;
+            background: #4da6ff;
+            border-radius: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: background 0.2s, transform 0.1s;
+        }
+        .game-button:active {
+            background: #357ab8;
+            transform: scale(0.97);
+        }
+    </style>
+</head>
+<body>
+    <h1>Select a Game</h1>
+    <div class="games">
+        <a class="game-button" href="colorgame/">Color Pop</a>
+        <a class="game-button" href="numbergame/">Number Match</a>
+        <a class="game-button" href="sortgame/">Shape Sorter</a>
+        <a class="game-button" href="whichone/">Emoji Match</a>
+        <a class="game-button" href="toys/">Toy Bounce</a>
+        <a class="game-button" href="pottytime/">Potty Training</a>
+    </div>
+</body>
+</html>
