@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About Us | P A V E B A N K</title>
+    <style>
+        :root {
+            --green: #00C853;
+            --green-dark: #00A844;
+            --green-light: #69F0AE;
+            --black: #0A0A0A;
+            --white: #FFFFFF;
+            --gray: #F5F5F5;
+            --gray-dark: #E0E0E0;
+            --text: #1A1A1A;
+            --text-light: #666666;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--white);
+            color: var(--text);
+            overflow-x: hidden;
+        }
+
+        .page-transition {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--green);
+            z-index: 9999;
+            transform: scaleY(0);
+            transform-origin: bottom;
+            pointer-events: none;
+        }
+
+        .page-transition.active {
+            animation: pageSlide 0.6s ease-in-out;
+        }
+
+        @keyframes pageSlide {
+            0% { transform: scaleY(0); transform-origin: bottom; }
+            50% { transform: scaleY(1); transform-origin: bottom; }
+            50.1% { transform-origin: top; }
+            100% { transform: scaleY(0); transform-origin: top; }
+        }
+
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 1.5rem 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--gray-dark);
+        }
+
+        .logo {
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: 0.5em;
+            color: var(--black);
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text);
+            text-decoration: none;
+            font-size: 0.9rem;
+            letter-spacing: 0.1em;
+            transition: color 0.3s ease;
+            position: relative;
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--green);
+            transition: width 0.3s ease;
+        }
+
+        .nav-links a:hover { color: var(--green); }
+        .nav-links a:hover::after { width: 100%; }
+
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+
+        .mobile-menu-btn svg {
+            width: 30px;
+            height: 30px;
+            stroke: var(--text);
+        }
+
+        @media (max-width: 768px) {
+            .mobile-menu-btn { display: block; }
+            .nav-links {
+                position: fixed;
+                top: 0;
+                right: -100%;
+                width: 70%;
+                height: 100vh;
+                background: var(--white);
+                flex-direction: column;
+                padding: 5rem 2rem;
+                transition: right 0.3s ease;
+                box-shadow: -5px 0 20px rgba(0, 0, 0, 0.1);
+            }
+            .nav-links.active { right: 0; }
+            nav { padding: 1rem 1.5rem; }
+        }
+
+        .page-hero {
+            min-height: 70vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 8rem 2rem 4rem;
+            position: relative;
+            overflow: hidden;
+            background: var(--gray);
+        }
+
+        .page-hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 40% 60%, rgba(0, 200, 83, 0.1) 0%, transparent 45%);
+            animation: heroGlow 8s ease-in-out infinite alternate;
+        }
+
+        @keyframes heroGlow {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            100% { transform: translate(-5%, 5%) rotate(10deg); }
+        }
+
+        .page-hero-content {
+            position: relative;
+            z-index: 1;
+            max-width: 900px;
+        }
+
+        .page-hero h1 {
+            font-size: clamp(2.5rem, 8vw, 5rem);
+            font-weight: 900;
+            letter-spacing: 0.2em;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, var(--green), var(--green-light));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            opacity: 0;
+            animation: fadeInUp 1s ease forwards;
+        }
+
+        .page-hero p {
+            font-size: 1.3rem;
+            line-height: 1.8;
+            opacity: 0;
+            animation: fadeInUp 1s ease forwards 0.3s;
+            color: var(--text-light);
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        section {
+            padding: 6rem 3rem;
+            position: relative;
+        }
+
+        .section-content {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .reveal {
+            opacity: 0;
+            transform: translateY(60px);
+            transition: all 0.8s cubic-bezier(0.17, 0.55, 0.55, 1);
+        }
+
+        .reveal.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Mission Section */
+        .mission {
+            background: var(--white);
+        }
+
+        .mission-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        @media (max-width: 900px) {
+            .mission-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .mission h2 {
+            font-size: 2.5rem;
+            margin-bottom: 1.5rem;
+            color: var(--green-dark);
+        }
+
+        .mission p {
+            font-size: 1.2rem;
+            line-height: 1.9;
+            color: var(--text-light);
+            margin-bottom: 1.5rem;
+        }
+
+        .mission-visual {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .mission-icon {
+            width: 250px;
+            height: 250px;
+            stroke: var(--green);
+            fill: none;
+            stroke-width: 0.5;
+            animation: rotate 30s linear infinite;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Why Section */
+        .why {
+            background: var(--black);
+            text-align: center;
+        }
+
+        .why h2 {
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            color: var(--white);
+        }
+
+        .why .lead {
+            font-size: 1.4rem;
+            max-width: 700px;
+            margin: 0 auto 4rem;
+            color: rgba(255, 255, 255, 0.9);
+            line-height: 1.8;
+        }
+
+        .why-text {
+            font-size: 3rem;
+            font-weight: 900;
+            letter-spacing: 0.1em;
+            color: var(--green);
+            opacity: 0.3;
+            margin-bottom: 2rem;
+        }
+
+        /* Commitments Section */
+        .commitments {
+            background: var(--gray);
+        }
+
+        .commitments h2 {
+            font-size: 2.5rem;
+            text-align: center;
+            margin-bottom: 4rem;
+            color: var(--green-dark);
+        }
+
+        .commitments-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+        }
+
+        @media (max-width: 900px) {
+            .commitments-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .commitment-card {
+            text-align: center;
+            padding: 3rem 2rem;
+            background: var(--white);
+            border: 1px solid var(--gray-dark);
+            border-radius: 1rem;
+            transition: all 0.4s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .commitment-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 200, 83, 0.1), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .commitment-card:hover::before {
+            left: 100%;
+        }
+
+        .commitment-card:hover {
+            border-color: var(--green);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 40px rgba(0, 200, 83, 0.15);
+        }
+
+        .commitment-icon {
+            width: 70px;
+            height: 70px;
+            margin: 0 auto 1.5rem;
+            stroke: var(--green);
+            fill: none;
+            stroke-width: 1.5;
+        }
+
+        .commitment-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            color: var(--green-dark);
+        }
+
+        .commitment-card p {
+            color: var(--text-light);
+            line-height: 1.7;
+        }
+
+        /* Stats Section */
+        .stats {
+            background: var(--white);
+            padding: 4rem 3rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 700px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .stat-number {
+            font-size: 3rem;
+            font-weight: 900;
+            color: var(--green);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--text-light);
+            font-size: 1rem;
+            letter-spacing: 0.1em;
+        }
+
+        .cta-button {
+            display: inline-block;
+            padding: 1rem 2.5rem;
+            background: linear-gradient(135deg, var(--green), var(--green-dark));
+            color: var(--white);
+            text-decoration: none;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            margin-top: 2rem;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0, 200, 83, 0.4);
+        }
+
+        footer {
+            background: var(--black);
+            padding: 4rem 3rem 2rem;
+            border-top: 1px solid rgba(0, 200, 83, 0.2);
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 4rem;
+        }
+
+        @media (max-width: 768px) {
+            .footer-content {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+        }
+
+        .footer-brand .logo {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            display: block;
+            color: var(--green);
+        }
+
+        .footer-brand p {
+            color: rgba(255, 255, 255, 0.6);
+            line-height: 1.7;
+        }
+
+        .footer-links h4 {
+            color: var(--green);
+            margin-bottom: 1.5rem;
+            font-size: 1rem;
+            letter-spacing: 0.1em;
+        }
+
+        .footer-links ul { list-style: none; }
+
+        .footer-links a {
+            color: rgba(255, 255, 255, 0.6);
+            text-decoration: none;
+            display: block;
+            padding: 0.5rem 0;
+            transition: color 0.3s ease;
+        }
+
+        .footer-links a:hover { color: var(--green); }
+
+        .footer-bottom {
+            max-width: 1200px;
+            margin: 3rem auto 0;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .footer-bottom p {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.9rem;
+        }
+
+        .regulatory {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-transition"></div>
+
+    <nav>
+        <a href="index.html" class="logo nav-link">P A V E B A N K</a>
+        <ul class="nav-links">
+            <li><a href="products.html" class="nav-link">Products</a></li>
+            <li><a href="programmability.html" class="nav-link">Programmability</a></li>
+            <li><a href="security.html" class="nav-link">Security</a></li>
+            <li><a href="about-us.html" class="nav-link">About</a></li>
+            <li><a href="contact.html" class="nav-link">Contact</a></li>
+        </ul>
+        <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <line x1="3" y1="6" x2="21" y2="6" stroke-width="2"/>
+                <line x1="3" y1="12" x2="21" y2="12" stroke-width="2"/>
+                <line x1="3" y1="18" x2="21" y2="18" stroke-width="2"/>
+            </svg>
+        </button>
+    </nav>
+
+    <section class="page-hero">
+        <div class="page-hero-content">
+            <h1>ABOUT US</h1>
+            <p>P A V E B A N K is built for a future financial system. We reimagine banking architecture and operations to provide every business access to multi-asset, regulated financial products.</p>
+        </div>
+    </section>
+
+    <section class="mission">
+        <div class="section-content">
+            <div class="mission-content">
+                <div class="reveal">
+                    <h2>Our Mission</h2>
+                    <p>We operate as a technology-focused product company while maintaining full banking regulation oversight for risk management and capital requirements.</p>
+                    <p>Our aim is to provide every business access to multi-asset, regulated, financial products that meet the demands of the modern economy.</p>
+                </div>
+                <div class="mission-visual reveal">
+                    <svg class="mission-icon" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="45"/>
+                        <circle cx="50" cy="50" r="35"/>
+                        <circle cx="50" cy="50" r="25"/>
+                        <circle cx="50" cy="50" r="15"/>
+                        <line x1="50" y1="5" x2="50" y2="95"/>
+                        <line x1="5" y1="50" x2="95" y2="50"/>
+                        <line x1="15" y1="15" x2="85" y2="85"/>
+                        <line x1="85" y1="15" x2="15" y2="85"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="why">
+        <div class="section-content">
+            <div class="why-text reveal">BANKING CAN BE BETTER</div>
+            <h2 class="reveal">Why P A V E B A N K?</h2>
+            <p class="lead reveal">We serve businesses needing modern financial infrastructure adapted to contemporary economic demands. Traditional banking wasn't built for today's global, always-on, multi-asset world.</p>
+            <a href="contact.html" class="cta-button nav-link reveal">Get In Touch</a>
+        </div>
+    </section>
+
+    <section class="commitments">
+        <div class="section-content">
+            <h2 class="reveal">Our Core Commitments</h2>
+            <div class="commitments-grid">
+                <div class="commitment-card reveal" style="transition-delay: 0.1s;">
+                    <svg class="commitment-icon" viewBox="0 0 24 24">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        <path d="M9 12l2 2 4-4"/>
+                    </svg>
+                    <h3>Client Deposit Protection</h3>
+                    <p>Deposits receive insurance coverage under Georgian law through the Deposit Insurance System.</p>
+                </div>
+                <div class="commitment-card reveal" style="transition-delay: 0.2s;">
+                    <svg class="commitment-icon" viewBox="0 0 24 24">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    <h3>Transparency</h3>
+                    <p>We maintain open disclosures with our key metrics, giving you confidence in our operations.</p>
+                </div>
+                <div class="commitment-card reveal" style="transition-delay: 0.3s;">
+                    <svg class="commitment-icon" viewBox="0 0 24 24">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                    </svg>
+                    <h3>Innovation</h3>
+                    <p>Financial systems evolve, requiring banks built for the new economy. We lead that change.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="stats">
+        <div class="section-content reveal">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number">24/7</div>
+                    <div class="stat-label">ALWAYS ON</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">305</div>
+                    <div class="stat-label">LICENSE NUMBER</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">&#8734;</div>
+                    <div class="stat-label">POSSIBILITIES</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="footer-content">
+            <div class="footer-brand">
+                <span class="logo">P A V E B A N K</span>
+                <p>Empowering businesses with 24/7 global, secure, multi-asset banking.</p>
+            </div>
+            <div class="footer-links">
+                <h4>EXPLORE</h4>
+                <ul>
+                    <li><a href="products.html" class="nav-link">Products</a></li>
+                    <li><a href="programmability.html" class="nav-link">Programmability</a></li>
+                    <li><a href="security.html" class="nav-link">Security</a></li>
+                </ul>
+            </div>
+            <div class="footer-links">
+                <h4>COMPANY</h4>
+                <ul>
+                    <li><a href="about-us.html" class="nav-link">About Us</a></li>
+                    <li><a href="contact.html" class="nav-link">Contact</a></li>
+                    <li><a href="legal.html" class="nav-link">Legal</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2024 P A V E B A N K. All Rights Reserved.</p>
+            <p class="regulatory">Licensed and Regulated by the National Bank of Georgia; License Number: 305</p>
+        </div>
+    </footer>
+
+    <script>
+        function reveal() {
+            const reveals = document.querySelectorAll('.reveal');
+            reveals.forEach(element => {
+                const windowHeight = window.innerHeight;
+                const elementTop = element.getBoundingClientRect().top;
+                const revealPoint = 150;
+                if (elementTop < windowHeight - revealPoint) {
+                    element.classList.add('active');
+                }
+            });
+        }
+
+        window.addEventListener('scroll', reveal);
+        reveal();
+
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                if (this.getAttribute('href').startsWith('http')) return;
+                e.preventDefault();
+                const href = this.getAttribute('href');
+                const transition = document.querySelector('.page-transition');
+                transition.classList.add('active');
+                setTimeout(() => {
+                    window.location.href = href;
+                }, 300);
+            });
+        });
+
+        function toggleMobileMenu() {
+            document.querySelector('.nav-links').classList.toggle('active');
+        }
+    </script>
+</body>
+</html>

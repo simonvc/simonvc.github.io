@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legal | P A V E B A N K</title>
+    <style>
+        :root {
+            --green: #00C853;
+            --green-dark: #00A844;
+            --green-light: #69F0AE;
+            --black: #0A0A0A;
+            --white: #FFFFFF;
+            --gray: #F5F5F5;
+            --gray-dark: #E0E0E0;
+            --text: #1A1A1A;
+            --text-light: #666666;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--white);
+            color: var(--text);
+            overflow-x: hidden;
+        }
+
+        .page-transition {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--green);
+            z-index: 9999;
+            transform: scaleY(0);
+            transform-origin: bottom;
+            pointer-events: none;
+        }
+
+        .page-transition.active {
+            animation: pageSlide 0.6s ease-in-out;
+        }
+
+        @keyframes pageSlide {
+            0% { transform: scaleY(0); transform-origin: bottom; }
+            50% { transform: scaleY(1); transform-origin: bottom; }
+            50.1% { transform-origin: top; }
+            100% { transform: scaleY(0); transform-origin: top; }
+        }
+
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 1.5rem 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--gray-dark);
+        }
+
+        .logo {
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: 0.5em;
+            color: var(--black);
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text);
+            text-decoration: none;
+            font-size: 0.9rem;
+            letter-spacing: 0.1em;
+            transition: color 0.3s ease;
+            position: relative;
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--green);
+            transition: width 0.3s ease;
+        }
+
+        .nav-links a:hover { color: var(--green); }
+        .nav-links a:hover::after { width: 100%; }
+
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+
+        .mobile-menu-btn svg {
+            width: 30px;
+            height: 30px;
+            stroke: var(--text);
+        }
+
+        @media (max-width: 768px) {
+            .mobile-menu-btn { display: block; }
+            .nav-links {
+                position: fixed;
+                top: 0;
+                right: -100%;
+                width: 70%;
+                height: 100vh;
+                background: var(--white);
+                flex-direction: column;
+                padding: 5rem 2rem;
+                transition: right 0.3s ease;
+                box-shadow: -5px 0 20px rgba(0, 0, 0, 0.1);
+            }
+            .nav-links.active { right: 0; }
+            nav { padding: 1rem 1.5rem; }
+        }
+
+        .page-hero {
+            min-height: 40vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 8rem 2rem 3rem;
+            position: relative;
+            overflow: hidden;
+            background: var(--gray);
+        }
+
+        .page-hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 50% 50%, rgba(0, 200, 83, 0.1) 0%, transparent 40%);
+        }
+
+        .page-hero-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .page-hero h1 {
+            font-size: clamp(2.5rem, 8vw, 4rem);
+            font-weight: 900;
+            letter-spacing: 0.2em;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--green), var(--green-light));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            opacity: 0;
+            animation: fadeInUp 1s ease forwards;
+        }
+
+        .page-hero p {
+            font-size: 1.2rem;
+            opacity: 0;
+            animation: fadeInUp 1s ease forwards 0.3s;
+            color: var(--text-light);
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .legal-section {
+            padding: 4rem 3rem 8rem;
+            background: var(--white);
+        }
+
+        .legal-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .reveal {
+            opacity: 0;
+            transform: translateY(60px);
+            transition: all 0.8s cubic-bezier(0.17, 0.55, 0.55, 1);
+        }
+
+        .reveal.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Tabs */
+        .legal-tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 3rem;
+            flex-wrap: wrap;
+        }
+
+        .legal-tab {
+            padding: 1rem 2rem;
+            background: var(--gray);
+            border: 1px solid var(--gray-dark);
+            border-radius: 50px;
+            color: var(--text);
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .legal-tab:hover {
+            border-color: var(--green);
+        }
+
+        .legal-tab.active {
+            background: linear-gradient(135deg, var(--green), var(--green-dark));
+            color: var(--white);
+            border-color: transparent;
+        }
+
+        /* Content */
+        .legal-content {
+            display: none;
+        }
+
+        .legal-content.active {
+            display: block;
+        }
+
+        .legal-content h2 {
+            font-size: 2rem;
+            margin-bottom: 2rem;
+            color: var(--green-dark);
+        }
+
+        .legal-content h3 {
+            font-size: 1.3rem;
+            margin: 2rem 0 1rem;
+            color: var(--green-dark);
+        }
+
+        .legal-content p {
+            color: var(--text-light);
+            line-height: 1.8;
+            margin-bottom: 1.5rem;
+        }
+
+        .legal-content ul {
+            margin-left: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .legal-content li {
+            color: var(--text-light);
+            line-height: 1.8;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Regulation Badge */
+        .regulation-badge {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            background: var(--gray);
+            border: 2px solid var(--green);
+            padding: 2rem;
+            border-radius: 1rem;
+            margin-top: 3rem;
+        }
+
+        .regulation-badge svg {
+            width: 50px;
+            height: 50px;
+            stroke: var(--green);
+            fill: none;
+            stroke-width: 1.5;
+            flex-shrink: 0;
+        }
+
+        .regulation-badge .text h3 {
+            color: var(--green-dark);
+            margin: 0 0 0.5rem 0;
+        }
+
+        .regulation-badge .text p {
+            color: var(--text-light);
+            margin: 0;
+        }
+
+        footer {
+            background: var(--black);
+            padding: 4rem 3rem 2rem;
+            border-top: 1px solid rgba(0, 200, 83, 0.2);
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 4rem;
+        }
+
+        @media (max-width: 768px) {
+            .footer-content {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+        }
+
+        .footer-brand .logo {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            display: block;
+            color: var(--green);
+        }
+
+        .footer-brand p {
+            color: rgba(255, 255, 255, 0.6);
+            line-height: 1.7;
+        }
+
+        .footer-links h4 {
+            color: var(--green);
+            margin-bottom: 1.5rem;
+            font-size: 1rem;
+            letter-spacing: 0.1em;
+        }
+
+        .footer-links ul { list-style: none; }
+
+        .footer-links a {
+            color: rgba(255, 255, 255, 0.6);
+            text-decoration: none;
+            display: block;
+            padding: 0.5rem 0;
+            transition: color 0.3s ease;
+        }
+
+        .footer-links a:hover { color: var(--green); }
+
+        .footer-bottom {
+            max-width: 1200px;
+            margin: 3rem auto 0;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .footer-bottom p {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.9rem;
+        }
+
+        .regulatory {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-transition"></div>
+
+    <nav>
+        <a href="index.html" class="logo nav-link">P A V E B A N K</a>
+        <ul class="nav-links">
+            <li><a href="products.html" class="nav-link">Products</a></li>
+            <li><a href="programmability.html" class="nav-link">Programmability</a></li>
+            <li><a href="security.html" class="nav-link">Security</a></li>
+            <li><a href="about-us.html" class="nav-link">About</a></li>
+            <li><a href="contact.html" class="nav-link">Contact</a></li>
+        </ul>
+        <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <line x1="3" y1="6" x2="21" y2="6" stroke-width="2"/>
+                <line x1="3" y1="12" x2="21" y2="12" stroke-width="2"/>
+                <line x1="3" y1="18" x2="21" y2="18" stroke-width="2"/>
+            </svg>
+        </button>
+    </nav>
+
+    <section class="page-hero">
+        <div class="page-hero-content">
+            <h1>LEGAL</h1>
+            <p>Legal information and policies</p>
+        </div>
+    </section>
+
+    <section class="legal-section">
+        <div class="legal-container">
+            <div class="legal-tabs reveal">
+                <button class="legal-tab active" onclick="showTab('privacy')">Privacy Policy</button>
+                <button class="legal-tab" onclick="showTab('terms')">Terms of Service</button>
+                <button class="legal-tab" onclick="showTab('regulatory')">Regulatory</button>
+            </div>
+
+            <div id="privacy" class="legal-content active reveal">
+                <h2>Privacy Policy</h2>
+                <p>At P A V E B A N K, we take your privacy seriously. This policy outlines how we collect, use, and protect your personal information.</p>
+
+                <h3>Information We Collect</h3>
+                <p>We collect information you provide directly to us, including:</p>
+                <ul>
+                    <li>Name, email address, and contact information</li>
+                    <li>Company and business information</li>
+                    <li>Financial and transaction data</li>
+                    <li>Identity verification documents</li>
+                </ul>
+
+                <h3>How We Use Your Information</h3>
+                <p>We use the information we collect to:</p>
+                <ul>
+                    <li>Provide, maintain, and improve our services</li>
+                    <li>Process transactions and send related information</li>
+                    <li>Comply with legal and regulatory requirements</li>
+                    <li>Communicate with you about products, services, and events</li>
+                </ul>
+
+                <h3>Data Security</h3>
+                <p>We implement robust security measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction. This includes advanced encryption, secure development practices, and strict access controls.</p>
+
+                <h3>Your Rights</h3>
+                <p>You have the right to access, correct, or delete your personal information. Contact us at <a href="mailto:contact@pavebank.com" style="color: var(--green);">contact@pavebank.com</a> for any privacy-related requests.</p>
+            </div>
+
+            <div id="terms" class="legal-content reveal">
+                <h2>Terms of Service</h2>
+                <p>By using P A V E B A N K services, you agree to these terms. Please read them carefully.</p>
+
+                <h3>Account Eligibility</h3>
+                <p>To use our services, you must be a legally registered business entity. You must provide accurate and complete information during registration and keep this information updated.</p>
+
+                <h3>Service Usage</h3>
+                <p>You agree to use our services only for lawful purposes and in accordance with applicable laws and regulations. You are responsible for all activity that occurs under your account.</p>
+
+                <h3>Fees and Payments</h3>
+                <p>Our fee structure is provided separately and may be updated from time to time. You agree to pay all applicable fees associated with your use of our services.</p>
+
+                <h3>Limitation of Liability</h3>
+                <p>P A V E B A N K shall not be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use of our services.</p>
+
+                <h3>Changes to Terms</h3>
+                <p>We may modify these terms at any time. Continued use of our services after changes constitutes acceptance of the modified terms.</p>
+            </div>
+
+            <div id="regulatory" class="legal-content reveal">
+                <h2>Regulatory Information</h2>
+                <p>P A V E B A N K operates as a fully regulated financial institution, committed to maintaining the highest standards of compliance and governance.</p>
+
+                <h3>Licensing</h3>
+                <p>P A V E B A N K is licensed and regulated by the National Bank of Georgia under License Number 305. As a regulated commercial bank, we adhere to all applicable banking laws and regulations.</p>
+
+                <h3>Deposit Insurance</h3>
+                <p>Client deposits are insured and protected within the framework of Georgian law under the Deposit Insurance System, providing you with peace of mind that your funds are secure.</p>
+
+                <h3>Compliance</h3>
+                <p>We maintain strict compliance with:</p>
+                <ul>
+                    <li>Anti-Money Laundering (AML) regulations</li>
+                    <li>Counter Financing of Terrorism (CFT) standards</li>
+                    <li>International sanctions requirements</li>
+                    <li>Bank secrecy laws and data protection regulations</li>
+                </ul>
+
+                <div class="regulation-badge">
+                    <svg viewBox="0 0 24 24">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="3" y1="9" x2="21" y2="9"/>
+                        <line x1="9" y1="21" x2="9" y2="9"/>
+                    </svg>
+                    <div class="text">
+                        <h3>National Bank of Georgia</h3>
+                        <p>License Number: 305</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="footer-content">
+            <div class="footer-brand">
+                <span class="logo">P A V E B A N K</span>
+                <p>Empowering businesses with 24/7 global, secure, multi-asset banking.</p>
+            </div>
+            <div class="footer-links">
+                <h4>EXPLORE</h4>
+                <ul>
+                    <li><a href="products.html" class="nav-link">Products</a></li>
+                    <li><a href="programmability.html" class="nav-link">Programmability</a></li>
+                    <li><a href="security.html" class="nav-link">Security</a></li>
+                </ul>
+            </div>
+            <div class="footer-links">
+                <h4>COMPANY</h4>
+                <ul>
+                    <li><a href="about-us.html" class="nav-link">About Us</a></li>
+                    <li><a href="contact.html" class="nav-link">Contact</a></li>
+                    <li><a href="legal.html" class="nav-link">Legal</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2024 P A V E B A N K. All Rights Reserved.</p>
+            <p class="regulatory">Licensed and Regulated by the National Bank of Georgia; License Number: 305</p>
+        </div>
+    </footer>
+
+    <script>
+        function reveal() {
+            const reveals = document.querySelectorAll('.reveal');
+            reveals.forEach(element => {
+                const windowHeight = window.innerHeight;
+                const elementTop = element.getBoundingClientRect().top;
+                const revealPoint = 150;
+                if (elementTop < windowHeight - revealPoint) {
+                    element.classList.add('active');
+                }
+            });
+        }
+
+        window.addEventListener('scroll', reveal);
+        reveal();
+
+        function showTab(tabId) {
+            // Hide all content
+            document.querySelectorAll('.legal-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            // Remove active from all tabs
+            document.querySelectorAll('.legal-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            // Show selected content
+            document.getElementById(tabId).classList.add('active');
+            // Add active to clicked tab
+            event.target.classList.add('active');
+        }
+
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                if (this.getAttribute('href').startsWith('http')) return;
+                if (this.getAttribute('href').startsWith('mailto')) return;
+                e.preventDefault();
+                const href = this.getAttribute('href');
+                const transition = document.querySelector('.page-transition');
+                transition.classList.add('active');
+                setTimeout(() => {
+                    window.location.href = href;
+                }, 300);
+            });
+        });
+
+        function toggleMobileMenu() {
+            document.querySelector('.nav-links').classList.toggle('active');
+        }
+    </script>
+</body>
+</html>
