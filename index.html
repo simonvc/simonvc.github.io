@@ -420,7 +420,9 @@
                     edge.end.mesh.position
                 ];
                 edge.line.geometry.setFromPoints(points);
-                edge.line.geometry.verticesNeedUpdate = true;
+                if (edge.line.geometry.attributes.position) {
+                    edge.line.geometry.attributes.position.needsUpdate = true;
+                }
             });
 
             // Calculate time delta
